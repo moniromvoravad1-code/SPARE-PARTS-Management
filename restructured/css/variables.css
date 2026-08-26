@@ -1,0 +1,61 @@
+/**
+ * css/variables.css - CSS custom properties and design tokens
+ */
+
+:root {
+  /* Colors - Backgrounds */
+  --bg: #EDF1F6;
+  --surface: #fff;
+  --surface2: #F6F9FC;
+  --surface3: #EEF3F9;
+  
+  /* Colors - Text */
+  --ink: #0B1220;
+  --ink2: #4A5A70;
+  --ink3: #8695AA;
+  
+  /* Colors - Borders & Dividers */
+  --line: #DEE6EF;
+  --line2: #CBD6E3;
+  
+  /* Colors - Navigation Rail */
+  --rail: #0D1626;
+  --rail2: #16233A;
+  --rail3: #233350;
+  --railInk: #93A4BD;
+  
+  /* Colors - Status */
+  --brand: #0F766E;
+  --brand2: #14958B;
+  --brandSoft: #E2F4F1;
+  
+  --ok: #12805C;
+  --okSoft: #E3F5EC;
+  
+  --low: #A55A08;
+  --lowSoft: #FDF0DC;
+  
+  --out: #B42318;
+  --outSoft: #FCE9E7;
+  
+  --ord: #1D4ED8;
+  --ordSoft: #E8EEFE;
+  
+  --mute: #64748B;
+  --muteSoft: #EEF2F7;
+  
+  /* Fonts */
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  
+  /* Spacing */
+  --r: 10px;
+  
+  /* Effects */
+  --sh: 0 1px 2px rgba(11, 18, 32, 0.06), 0 1px 3px rgba(11, 18, 32, 0.04);
+  --shL: 0 10px 30px rgba(11, 18, 32, 0.14);
+  
+  /* Safe area insets (mobile) */
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+}

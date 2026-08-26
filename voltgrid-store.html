@@ -1,0 +1,2441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0D1626">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>VoltGrid Store — Spare Parts &amp; Tools</title>
+<style>
+:root{
+  --bg:#EDF1F6; --surface:#fff; --surface2:#F6F9FC; --surface3:#EEF3F9;
+  --ink:#0B1220; --ink2:#4A5A70; --ink3:#8695AA; --line:#DEE6EF; --line2:#CBD6E3;
+  --rail:#0D1626; --rail2:#16233A; --rail3:#233350; --railInk:#93A4BD;
+  --brand:#0F766E; --brand2:#14958B; --brandSoft:#E2F4F1;
+  --ok:#12805C; --okSoft:#E3F5EC;
+  --low:#A55A08; --lowSoft:#FDF0DC;
+  --out:#B42318; --outSoft:#FCE9E7;
+  --ord:#1D4ED8; --ordSoft:#E8EEFE;
+  --mute:#64748B; --muteSoft:#EEF2F7;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --r:10px; --sh:0 1px 2px rgba(11,18,32,.06),0 1px 3px rgba(11,18,32,.04);
+  --shL:0 10px 30px rgba(11,18,32,.14);
+  --sat:env(safe-area-inset-top); --sab:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{font-family:var(--ui);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+a{color:var(--brand);text-decoration:none}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hide{display:none!important}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============ LOCK SCREEN ============ */
+#lock{position:fixed;inset:0;z-index:200;background:
+   radial-gradient(1200px 600px at 20% -10%,#1B3350 0%,transparent 60%),
+   radial-gradient(900px 500px at 110% 110%,#0F4F4A 0%,transparent 55%),#0A1220;
+  display:flex;flex-direction:column;color:#fff;
+  padding:calc(var(--sat) + 22px) 22px calc(var(--sab) + 22px)}
+#lock.gone{display:none}
+.lk-top{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+.lk-clock{font-family:var(--mono);font-size:60px;font-weight:200;letter-spacing:-2px;line-height:1}
+.lk-date{color:#8FA3BE;font-size:13px;margin-top:8px;letter-spacing:.5px}
+.lk-brand{display:flex;align-items:center;gap:10px;margin-top:34px}
+.lk-brand img{width:38px;height:38px;border-radius:9px;object-fit:cover}
+.lk-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(140deg,var(--brand2),#0B5F70);
+  display:grid;place-items:center;font-weight:800;font-size:16px}
+.lk-name{font-size:19px;font-weight:700;letter-spacing:-.3px}
+.lk-sub{font-size:11px;color:#7F93AE;letter-spacing:1.6px;text-transform:uppercase;margin-top:2px}
+.lk-form{width:100%;max-width:380px;margin:0 auto}
+.lk-field{position:relative;margin-bottom:11px}
+.lk-field input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+  color:#fff;border-radius:12px;padding:15px 46px 15px 15px;font-size:16px;outline:none}
+.lk-field input:focus{border-color:var(--brand2);background:rgba(255,255,255,.1)}
+.lk-field input::placeholder{color:#7186A2}
+.lk-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);padding:10px;color:#8FA3BE;font-size:12px}
+.lk-go{width:100%;background:var(--brand2);color:#fff;font-weight:700;border-radius:12px;padding:15px;font-size:15px;
+  margin-top:4px}
+.lk-go:active{transform:scale(.99)}
+.lk-err{background:rgba(180,35,24,.2);border:1px solid rgba(255,120,110,.35);color:#FFB4AD;
+  border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:11px}
+.lk-hint{margin-top:16px;font-size:11.5px;color:#6D82A0;text-align:center;line-height:1.7}
+.lk-hint b{color:#9FB4D0;font-weight:600}
+.lk-chips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:9px}
+.lk-chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#B7C7DC;
+  padding:6px 11px;border-radius:999px;font-size:11.5px}
+.lk-chip:active{background:rgba(255,255,255,.16)}
+
+/* ============ SHELL ============ */
+#app{display:none;min-height:100%}
+#app.on{display:block}
+.rail{position:fixed;top:0;left:0;bottom:0;width:236px;background:var(--rail);z-index:60;
+  display:flex;flex-direction:column;padding-top:var(--sat);transition:transform .22s ease}
+.rail-head{padding:16px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--rail3)}
+.rail-head img{width:32px;height:32px;border-radius:8px;object-fit:cover;flex:none}
+.rail-mark{width:32px;height:32px;border-radius:8px;flex:none;background:linear-gradient(140deg,var(--brand2),#0B5F70);
+  display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px}
+.rail-nm{color:#fff;font-weight:700;font-size:14.5px;letter-spacing:-.2px;line-height:1.2}
+.rail-sb{color:#6E829E;font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;margin-top:1px}
+.nav{flex:1;overflow-y:auto;padding:12px 10px}
+.nav-lbl{color:#56698A;font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;padding:12px 8px 6px;font-weight:700}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:8px;color:var(--railInk);
+  font-size:13.5px;font-weight:500;margin-bottom:2px;cursor:pointer}
+.nav a .ic{width:18px;text-align:center;font-size:15px;flex:none;opacity:.9}
+.nav a .bdg{margin-left:auto;background:var(--out);color:#fff;font-size:10px;font-weight:800;
+  padding:1px 6px;border-radius:999px;min-width:18px;text-align:center}
+.nav a .bdg.amber{background:#C2740D}
+.nav a:hover{background:var(--rail2);color:#D6E1EE}
+.nav a.on{background:var(--rail3);color:#fff;box-shadow:inset 3px 0 0 var(--brand2)}
+.rail-foot{padding:11px 16px calc(11px + var(--sab));border-top:1px solid var(--rail3);
+  color:#54678A;font-size:10.5px;display:flex;justify-content:space-between;align-items:center}
+.scrim{position:fixed;inset:0;background:rgba(6,11,20,.55);z-index:55;display:none}
+.scrim.on{display:block}
+
+.main{margin-left:236px;min-height:100vh;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);padding-top:var(--sat)}
+.top-in{height:54px;display:flex;align-items:center;gap:10px;padding:0 16px}
+.burger{display:none;width:36px;height:36px;border-radius:8px;background:var(--surface3);
+  place-items:center;font-size:16px;flex:none}
+.pg-t{font-size:15.5px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-r{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.sitesel{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;
+  font-size:12.5px;font-weight:600;max-width:170px;outline:none}
+.icbtn{width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--line);
+  display:grid;place-items:center;font-size:14px;position:relative}
+.icbtn .dot{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--out)}
+.avat{width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;
+  font-weight:700;font-size:12.5px;flex:none}
+.wrap{padding:16px;max-width:1360px;width:100%;margin:0 auto;flex:1}
+
+/* ============ CARDS / KPI ============ */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;box-shadow:var(--sh);
+  position:relative;overflow:hidden;text-align:left;display:block;width:100%}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line2)}
+.kpi.ok:before{background:var(--ok)} .kpi.low:before{background:var(--low)}
+.kpi.out:before{background:var(--out)} .kpi.ord:before{background:var(--ord)}
+.kpi.br:before{background:var(--brand)}
+.kpi-l{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
+.kpi-v{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-1.2px;margin-top:5px;line-height:1}
+.kpi-d{font-size:11.5px;color:var(--ink2);margin-top:5px}
+.kpi-d .up{color:var(--out);font-weight:700}
+.kpi-d .dn{color:var(--ok);font-weight:700}
+.kpi-d .fl{color:var(--ink3);font-weight:700}
+/* consumption bars */
+.bars{display:flex;align-items:flex-end;gap:5px;height:150px;padding-top:6px}
+.bcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.bcol .pair{display:flex;align-items:flex-end;gap:2px;width:100%;height:100%;justify-content:center}
+.bcol i{display:block;width:100%;max-width:15px;border-radius:3px 3px 0 0;min-height:2px;transition:height .35s}
+.bcol i.bin{background:var(--ok)}
+.bcol i.bout{background:var(--brand)}
+.bcol.now i{opacity:.55}
+.bcol b{font-family:var(--mono);font-size:9.5px;color:var(--ink2);margin-bottom:4px;white-space:nowrap;font-weight:600}
+.bcol span{font-size:9.5px;color:var(--ink3);margin-top:5px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.bcol.now span{color:var(--low);font-weight:700}
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink3);margin-top:10px;flex-wrap:wrap}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.top5{display:flex;flex-direction:column;gap:9px}
+.t5r{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.t5r .t5n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t5r .t5b{width:34%;flex:none}
+.t5r .t5v{font-family:var(--mono);font-size:11.5px;color:var(--ink2);flex:none;width:66px;text-align:right}
+
+.pg-s{font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.sitebtn{display:flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--line);
+  border-radius:8px;padding:7px 10px;font-size:12.5px;max-width:250px;flex:none}
+.sitebtn .cd{font-family:var(--mono);font-weight:700;letter-spacing:.3px}
+.sitebtn .nm{font-weight:500;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sitebtn .cv{color:var(--ink3);font-size:10px;flex:none}
+.sitebtn .wd{width:7px;height:7px;border-radius:50%;background:var(--out);flex:none}
+.siterow{display:flex;gap:11px;align-items:center;width:100%;padding:13px 16px;border-bottom:1px solid var(--line);
+  text-align:left;background:none}
+.siterow:last-child{border-bottom:0}
+.siterow:hover{background:var(--surface2)}
+.siterow.on{background:var(--brandSoft)}
+.siterow .cd{width:46px;height:40px;border-radius:9px;background:var(--rail);color:#fff;display:grid;
+  place-items:center;font-family:var(--mono);font-weight:700;font-size:12.5px;flex:none}
+.siterow.on .cd{background:var(--brand)}
+.siterow .nm{font-size:13.5px;font-weight:600;line-height:1.3}
+.siterow .mt{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.siterow .tk{margin-left:auto;flex:none;text-align:right}
+
+/* category breakdown */
+.catrow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line);
+  width:100%;text-align:left;background:none}
+.catrow:last-child{border-bottom:0}
+.catrow:hover{background:var(--surface2)}
+.cat-n{width:112px;flex:none}
+.cat-n b{font-size:13px;font-weight:600;display:block}
+.cat-n span{font-size:11px;color:var(--ink3);display:block;margin-top:1px}
+.cat-b{flex:1;min-width:60px}
+.stack{height:9px;border-radius:5px;background:var(--surface3);display:flex;overflow:hidden}
+.stack i{display:block;height:100%;transition:width .3s}
+.stack i.g{background:var(--brand)}
+.stack i.r{background:var(--out)}
+.cat-v{flex:none;width:98px;text-align:right}
+.cat-v b{font-family:var(--mono);font-size:12.5px;font-weight:600;display:block}
+.cat-v span{font-size:10.5px;color:var(--ink3);display:block;margin-top:1px}
+.cat-chips{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--surface3);border-radius:8px;padding:3px;gap:2px}
+.seg button{padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--ink2)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh)}
+@media(max-width:860px){
+  .catrow{flex-wrap:wrap;gap:8px}
+  .cat-n{width:auto;flex:1}
+  .cat-v{width:auto}
+  .cat-b{flex-basis:100%;order:3;min-width:0}
+}
+
+.morerow{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 14px;
+  border-top:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--brand);background:var(--surface2)}
+.morerow:hover{background:var(--surface3)}
+.morerow span{color:var(--ink3);font-weight:500}
+
+/* photos */
+.th{width:40px;height:40px;border-radius:8px;object-fit:cover;background:var(--surface3);flex:none;display:block;
+  cursor:zoom-in;border:1px solid var(--line)}
+.th.ph0{display:grid;place-items:center;font-family:var(--mono);font-size:10.5px;font-weight:700;
+  color:var(--ink3);cursor:default;letter-spacing:.3px}
+.th.lg{width:54px;height:54px;border-radius:9px}
+.hero{width:100%;max-height:230px;object-fit:contain;background:var(--surface3);border-radius:10px;
+  margin-bottom:14px;display:block;cursor:zoom-in;border:1px solid var(--line)}
+.phfld{display:flex;gap:11px;align-items:flex-start}
+.phfld .pv{width:74px;height:74px;border-radius:10px;object-fit:cover;background:var(--surface3);
+  border:1px solid var(--line);flex:none;display:block}
+.phfld .pv.ph0{display:grid;place-items:center;color:var(--ink3);font-size:20px}
+.phfld .ac{flex:1;min-width:0;display:flex;gap:6px;flex-wrap:wrap}
+.lbl-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:5px 9px;border-radius:7px;
+  font-size:11.5px;font-weight:600;background:var(--surface2);border:1px solid var(--line2);color:var(--ink);cursor:pointer}
+.lbl-btn:hover{background:var(--surface3)}
+.bar-use{height:8px;border-radius:4px;background:var(--surface3);overflow:hidden;margin:8px 0 4px}
+.bar-use i{display:block;height:100%;background:var(--brand);transition:width .3s}
+.bar-use i.warn{background:var(--low)} .bar-use i.full{background:var(--out)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:14px}
+.card-h{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px}
+.card-t{font-size:13.5px;font-weight:700;letter-spacing:-.1px}
+.card-s{font-size:11.5px;color:var(--ink3);margin-top:1px}
+.card-h .r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.card-b{padding:14px}
+.card-b.flush{padding:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+
+/* ============ CONTROLS ============ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 13px;border-radius:8px;
+  font-size:12.5px;font-weight:600;background:var(--surface2);border:1px solid var(--line2);color:var(--ink)}
+.btn:hover{background:var(--surface3)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.pri:hover{background:var(--brand2)}
+.btn.dgr{background:var(--out);border-color:var(--out);color:#fff}
+.btn.sm{padding:5px 9px;font-size:11.5px;border-radius:7px}
+.btn.blk{width:100%}
+.btn:disabled{opacity:.45;pointer-events:none}
+.tabs{display:flex;gap:4px;overflow-x:auto;padding:3px;background:var(--surface3);border-radius:9px;margin-bottom:12px}
+.tabs button{padding:7px 13px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.tabs button.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh)}
+.tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.srch{flex:1;min-width:170px;position:relative}
+.srch input{width:100%;padding:9px 11px 9px 32px;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface);outline:none;font-size:13px}
+.srch input:focus{border-color:var(--brand)}
+.srch:before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink3);font-size:15px}
+.sel{padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:12.5px;
+  font-weight:600;outline:none}
+.fld{margin-bottom:11px}
+.fld label{display:block;font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:5px}
+.fld input,.fld select,.fld textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface);font-size:15px;outline:none}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--brand)}
+.fld textarea{min-height:66px;resize:vertical;font-size:14px}
+.fld .hlp{font-size:11px;color:var(--ink3);margin-top:4px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ============ TABLE / ROWS ============ */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink3);
+  font-weight:700;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--surface2);white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover{background:var(--surface2)}
+.tbl .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.pname{font-weight:600}
+.psku{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:10.5px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.pill.ok{background:var(--okSoft);color:var(--ok)}
+.pill.low{background:var(--lowSoft);color:var(--low)}
+.pill.out{background:var(--outSoft);color:var(--out)}
+.pill.ord{background:var(--ordSoft);color:var(--ord)}
+.pill.mute{background:var(--muteSoft);color:var(--mute)}
+.pill.br{background:var(--brandSoft);color:var(--brand)}
+/* signature: stock level bar */
+.sb{position:relative;height:6px;background:var(--surface3);border-radius:3px;overflow:visible;min-width:78px}
+.sb i{display:block;height:6px;border-radius:3px;background:var(--ok);transition:width .3s}
+.sb.low i{background:var(--low)} .sb.out i{background:var(--out)}
+.sb u{position:absolute;top:-3px;height:12px;width:2px;background:var(--ink);opacity:.5;border-radius:1px}
+.sb-lg{font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-top:3px;display:flex;justify-content:space-between}
+.rows{display:none}
+.row{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;gap:11px;align-items:flex-start}
+.row:last-child{border-bottom:0}
+.row-m{flex:1;min-width:0}
+.row-r{text-align:right;flex:none}
+.row-x{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.empty{padding:40px 20px;text-align:center;color:var(--ink3)}
+.empty .e-i{font-size:30px;opacity:.35}
+.empty .e-t{font-weight:700;color:var(--ink2);margin-top:8px;font-size:13.5px}
+.empty .e-s{font-size:12.5px;margin-top:3px}
+
+/* alert list */
+.al{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);align-items:center;width:100%;text-align:left}
+.al:last-child{border-bottom:0}
+.al:hover{background:var(--surface2)}
+.al-i{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:13px;flex:none}
+.al-i.out{background:var(--outSoft);color:var(--out)}
+.al-i.low{background:var(--lowSoft);color:var(--low)}
+.al-i.ord{background:var(--ordSoft);color:var(--ord)}
+.al-i.br{background:var(--brandSoft);color:var(--brand)}
+.al-t{font-size:13px;font-weight:600;line-height:1.3}
+.al-s{font-size:11.5px;color:var(--ink3);margin-top:1px}
+.al-r{margin-left:auto;text-align:right;flex:none;font-size:11.5px}
+
+/* ============ MODAL / SHEET ============ */
+.mask{position:fixed;inset:0;background:rgba(6,11,20,.5);z-index:100;display:none;
+  align-items:center;justify-content:center;padding:18px}
+.mask.on{display:flex}
+.modal{background:var(--surface);border-radius:14px;width:100%;max-width:520px;max-height:88vh;
+  display:flex;flex-direction:column;box-shadow:var(--shL);overflow:hidden}
+.m-h{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.m-t{font-size:15px;font-weight:700}
+.m-s{font-size:11.5px;color:var(--ink3);margin-top:1px}
+.m-x{margin-left:auto;width:30px;height:30px;border-radius:7px;background:var(--surface3);display:grid;
+  place-items:center;font-size:15px;flex:none}
+.m-b{padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.m-f{padding:12px 16px calc(12px + var(--sab));border-top:1px solid var(--line);display:flex;gap:8px}
+.m-f .btn{flex:1;padding:11px}
+.menu{position:fixed;z-index:110;background:var(--surface);border:1px solid var(--line);border-radius:11px;
+  box-shadow:var(--shL);padding:5px;min-width:190px;display:none}
+.menu.on{display:block}
+.menu button{display:flex;align-items:center;gap:9px;width:100%;padding:9px 11px;border-radius:7px;
+  font-size:13px;text-align:left;font-weight:500}
+.menu button:hover{background:var(--surface2)}
+.menu button.dgr{color:var(--out)}
+.menu .div{height:1px;background:var(--line);margin:4px 0}
+.menu .mh{padding:9px 11px 7px;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(120%);bottom:calc(20px + var(--sab));z-index:150;
+  background:var(--rail);color:#fff;padding:11px 17px;border-radius:11px;font-size:13px;font-weight:600;
+  box-shadow:var(--shL);transition:transform .25s;max-width:90vw;text-align:center}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.toast.bad{background:var(--out)}
+.toast.good{background:var(--ok)}
+
+/* qty stepper */
+.step{display:flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.step button{width:46px;height:46px;font-size:20px;font-weight:600;background:var(--surface2);color:var(--ink2)}
+.step button:active{background:var(--surface3)}
+.step input{flex:1;text-align:center;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);
+  font-family:var(--mono);font-size:19px;font-weight:600;height:46px;outline:none;width:100%;padding:0}
+.pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:7px}
+.pick button{padding:11px 8px;border:1px solid var(--line);border-radius:9px;font-size:12.5px;font-weight:600;
+  background:var(--surface)}
+.pick button.on{border-color:var(--brand);background:var(--brandSoft);color:var(--brand)}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.kv:last-child{border-bottom:0}
+.kv span{color:var(--ink3)}
+.kv b{font-weight:600;text-align:right}
+
+@media(max-width:860px){
+  .rail{transform:translateX(-100%);width:265px;box-shadow:var(--shL)}
+  .rail.on{transform:translateX(0)}
+  .main{margin-left:0}
+  .burger{display:grid}
+  .wrap{padding:12px}
+  .tbl{display:none}
+  .rows{display:block}
+  .kpis{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi-v{font-size:22px}
+  .sitebtn .nm{display:none}
+  .sitebtn{padding:7px 9px}
+  .f2{grid-template-columns:1fr}
+  .mask{padding:0;align-items:flex-end}
+  .modal{max-width:100%;border-radius:16px 16px 0 0;max-height:92vh}
+}
+@media print{.rail,.top,.tools,.tabs{display:none}.main{margin:0}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOCK SCREEN ================= -->
+<div id="lock">
+  <div class="lk-top">
+    <div class="lk-clock mono" id="lkTime">--:--</div>
+    <div class="lk-date" id="lkDate"></div>
+    <div class="lk-brand">
+      <div id="lkLogo" class="lk-mark">VG</div>
+      <div style="text-align:left">
+        <div class="lk-name" id="lkName">VoltGrid Store</div>
+        <div class="lk-sub">Spare Parts &amp; Tools</div>
+      </div>
+    </div>
+  </div>
+  <div class="lk-form">
+    <div id="lkErr" class="lk-err hide"></div>
+    <div class="lk-field"><input id="lkUser" type="text" placeholder="Username" autocomplete="username"
+      autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+    <div class="lk-field">
+      <input id="lkPass" type="password" placeholder="Password" autocomplete="current-password">
+      <button class="lk-eye" id="lkEye" type="button">Show</button>
+    </div>
+    <button class="lk-go" id="lkGo">Sign in</button>
+    <div class="lk-hint">Demo accounts — tap to fill</div>
+    <div class="lk-chips">
+      <button class="lk-chip" data-u="manager" data-p="manager123">Manager</button>
+      <button class="lk-chip" data-u="storekeeper" data-p="store123">Storekeeper</button>
+      <button class="lk-chip" data-u="tech" data-p="tech123">Technician</button>
+      <button class="lk-chip" data-u="guest" data-p="guest123">Guest</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <div class="scrim" id="scrim"></div>
+
+  <aside class="rail" id="rail">
+    <div class="rail-head">
+      <div id="rlLogo" class="rail-mark">VG</div>
+      <div style="min-width:0">
+        <div class="rail-nm" id="rlName">VoltGrid Store</div>
+        <div class="rail-sb">Parts &amp; Tools</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="rail-foot">
+      <span>Version 1.0</span>
+      <span id="syncDot">● offline</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="top-in">
+        <button class="burger" id="burger">☰</button>
+        <div style="min-width:0;flex:1">
+          <div class="pg-t" id="pgTitle">Overview</div>
+          <div class="pg-s" id="pgSite"></div>
+        </div>
+        <div class="top-r">
+          <button class="sitebtn" id="siteBtn"></button>
+          <button class="icbtn" id="alertBtn">🔔<span class="dot hide" id="alertDot"></span></button>
+          <button class="avat" id="meBtn">--</button>
+        </div>
+      </div>
+    </header>
+    <div class="wrap" id="page"></div>
+  </div>
+</div>
+
+<div class="menu" id="menu"></div>
+<div class="mask" id="mask"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================
+   VoltGrid Store — Spare Parts, Tools, Calibration, Purchasing
+   Single-file app. IndexedDB primary, localStorage fallback.
+   ========================================================= */
+
+const DB_NAME='voltgrid_store', DB_STORE='kv', LS_KEY='voltgrid_store_v1';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=p=>p+'_'+Math.random().toString(36).slice(2,9);
+const DAY=86400000;
+const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d;};
+const iso=d=>new Date(d).toISOString().slice(0,10);
+const addD=(n,base)=>iso(new Date((base?new Date(base):today()).getTime()+n*DAY));
+const daysTo=d=>Math.round((new Date(d+'T00:00:00')-today())/DAY);
+const fmtD=d=>{if(!d)return '—';const x=new Date(d+'T00:00:00');
+  return x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});};
+const fmtDT=t=>new Date(t).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+const money=n=>'$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const ago=t=>{const s=(Date.now()-t)/1000;
+  if(s<60)return 'just now'; if(s<3600)return Math.floor(s/60)+'m ago';
+  if(s<86400)return Math.floor(s/3600)+'h ago'; if(s<604800)return Math.floor(s/86400)+'d ago'; return fmtDT(t);};
+
+/* ---------- storage ---------- */
+let _db=null;
+function openDB(){return new Promise(res=>{
+  if(!window.indexedDB)return res(null);
+  try{const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(DB_STORE))d.createObjectStore(DB_STORE);};
+    r.onsuccess=e=>res(e.target.result); r.onerror=()=>res(null);
+    setTimeout(()=>res(_db),2500);
+  }catch(e){res(null)}});}
+async function dbGet(k){
+  if(_db){try{return await new Promise((res,rej)=>{const t=_db.transaction(DB_STORE,'readonly').objectStore(DB_STORE).get(k);
+    t.onsuccess=()=>res(t.result); t.onerror=()=>rej();});}catch(e){}}
+  try{const v=localStorage.getItem(k);return v?JSON.parse(v):undefined;}catch(e){return undefined;}}
+async function dbSet(k,v){
+  if(_db){try{await new Promise((res,rej)=>{const t=_db.transaction(DB_STORE,'readwrite').objectStore(DB_STORE).put(v,k);
+    t.onsuccess=()=>res(); t.onerror=()=>rej();});}catch(e){}}
+  try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+/* ---------- roles ---------- */
+const ROLES={
+  manager:{label:'Manager',pages:['home','parts','tools','cal','war','po','log','admin'],
+    can:{edit:1,issue:1,receive:1,adjust:1,checkout:1,po:1,poApprove:1,cal:1,admin:1,creds:1,del:1}},
+  storekeeper:{label:'Storekeeper',pages:['home','parts','tools','cal','war','po','log','admin'],
+    can:{edit:1,issue:1,receive:1,adjust:1,checkout:1,po:1,poApprove:0,cal:1,admin:0,creds:0,del:0}},
+  tech:{label:'Technician',pages:['home','parts','tools','cal','war','po','log'],
+    can:{edit:0,issue:1,receive:0,adjust:0,checkout:1,po:0,poApprove:0,cal:0,admin:0,creds:0,del:0}},
+  guest:{label:'Guest',pages:['home','parts','tools','cal','war'],
+    can:{edit:0,issue:0,receive:0,adjust:0,checkout:0,po:0,poApprove:0,cal:0,admin:0,creds:0,del:0}}
+};
+const can=k=>!!(VIEW.user&&ROLES[VIEW.user.role]&&ROLES[VIEW.user.role].can[k]);
+
+const NAV=[
+  {g:'Store'},
+  {id:'home',ic:'▦',t:'Overview'},
+  {id:'parts',ic:'▤',t:'Spare Parts'},
+  {id:'tools',ic:'⚒',t:'Tools'},
+  {g:'Compliance'},
+  {id:'cal',ic:'◎',t:'Calibration'},
+  {id:'war',ic:'▣',t:'Warranty'},
+  {g:'Supply'},
+  {id:'po',ic:'⇄',t:'Purchase Orders'},
+  {id:'log',ic:'≡',t:'Activity Log'},
+  {g:'System'},
+  {id:'admin',ic:'⚙',t:'Settings'}
+];
+
+/* ---------- seed ---------- */
+function seed(){
+  const T=Date.now();
+  const sites=[
+    {id:'TMP',name:'Tmart Pong Central Warehouse',   code:'TMP'},
+    {id:'CHT',name:'Chhoeu Tom SNTK 1000MWh',        code:'CHT'},
+    {id:'AMP',name:'Amp Leang SNTL 600MWh',          code:'AMP'},
+    {id:'SNA',name:'Sna Ansa SNTL 400MWh',           code:'SNA'},
+    {id:'SVC',name:'Svay Chek SNTV 12MWh',           code:'SVC'}
+  ];
+  const P=(sku,name,cat,site,qty,min,unit,bin,cost,sup,lt)=>
+    ({id:uid('p'),sku,name,cat,site,qty,min,unit,bin,cost,sup,lt,photo:'',updated:T-Math.random()*20*DAY});
+  const parts=[
+    P('BAT-LFP-280','LFP Cell 3.2V 280Ah','Battery','CHT',14,12,'pcs','A1-03',96,'CATL Asia',45),
+    P('BAT-BMU-V2','Battery Module BMU Board','Battery','CHT',2,4,'pcs','A1-07',310,'CATL Asia',60),
+    P('BAT-FUSE-125','DC Fuse 125A gPV','Battery','TMP',26,15,'pcs','A2-01',18.5,'Mersen',21),
+    P('BAT-BUS-CU','Copper Busbar 40x5 1m','Battery','TMP',7,6,'pcs','A2-04',42,'Local Metal',10),
+    P('PCS-IGBT-M','IGBT Module 1200V 600A','PCS','CHT',1,2,'pcs','B1-02',780,'Sungrow SEA',75),
+    P('PCS-FAN-24','Cabinet Fan 24VDC 172mm','PCS','SVC',0,6,'pcs','B1-05',34,'Sungrow SEA',30),
+    P('PCS-CAP-DC','DC Link Capacitor 500uF','PCS','AMP',5,4,'pcs','B1-08',120,'Sungrow SEA',60),
+    P('PCS-CTRL-BD','PCS Control Board Rev.C','PCS','TMP',3,2,'pcs','B2-01',540,'Sungrow SEA',90),
+    P('HVA-FLT-G4','HVAC Filter G4 592x592','HVAC','SNA',4,10,'pcs','C1-01',12,'Airtech KH',14),
+    P('HVA-COMP-5T','Scroll Compressor 5TR','HVAC','TMP',1,1,'pcs','C1-06',890,'Airtech KH',45),
+    P('HVA-GAS-410','Refrigerant R410A 11.3kg','HVAC','TMP',3,2,'cyl','C2-02',165,'Airtech KH',14),
+    P('ELE-CB-630','MCCB 630A 4P','Electrical','SVC',2,2,'pcs','D1-02',420,'Schneider KH',30),
+    P('ELE-CT-1000','Current Transformer 1000/5','Electrical','AMP',8,6,'pcs','D1-05',58,'Schneider KH',21),
+    P('ELE-SPD-T2','Surge Protector Type 2 DC','Electrical','CHT',3,8,'pcs','D1-09',76,'Schneider KH',21),
+    P('ELE-CBL-95','Cable Cu 1x95mm2 XLPE','Electrical','TMP',180,120,'m','D3-00',9.4,'Cadivi',20),
+    P('FIR-AER-6K','Aerosol Fire Suppressor 6kg','Fire','CHT',6,4,'pcs','E1-01',235,'Firepro Asia',40),
+    P('FIR-DET-SMK','Smoke Detector Addressable','Fire','SNA',5,6,'pcs','E1-04',64,'Firepro Asia',28),
+    P('FIR-VALV-N2','N2 Cylinder Valve Assy','Fire','TMP',2,2,'pcs','E2-01',310,'Firepro Asia',50),
+    P('COM-SW-8P','Industrial Switch 8-Port SFP','Comms','AMP',3,3,'pcs','F1-02',290,'Moxa SEA',35),
+    P('COM-RTU-EX','RTU Expansion I/O Card','Comms','TMP',4,3,'pcs','F1-06',180,'Moxa SEA',35),
+    P('COM-FBR-SM','Fibre Patch LC-LC 10m SM','Comms','TMP',22,12,'pcs','F2-03',11,'Local IT',7),
+    P('CON-TORQ-GR','Anti-seize Grease 500g','Consumable','TMP',9,6,'tub','G1-01',22,'Local Supply',7),
+    P('CON-WIPE-IND','Industrial Wipes 200pc','Consumable','SNA',2,8,'box','G1-03',14,'Local Supply',5),
+    P('CON-TAG-LOT','Lockout Tag Set (10)','Consumable','TMP',11,8,'set','G1-06',26,'Local Supply',10)
+  ];
+  const K=(code,name,cat,site,status,holder,out,due,calI,calL,cert)=>({
+    id:uid('t'),code,name,cat,site,status,holder:holder||'',outAt:out||null,dueAt:due||null,
+    calInt:calI||0,calLast:calL||null,calNext:calL?addD(calI*30,calL):null,cert:cert||'',cond:'Good',notes:'',photo:''});
+  const tools=[
+    K('TL-001','Fluke 87V Digital Multimeter','Test & Measure','CHT','out','Sok Piseth',T-3*DAY,addD(-1),12,addD(-300),'CAL-9921'),
+    K('TL-002','Fluke 1587 Insulation Tester','Test & Measure','TMP','in','',null,null,12,addD(-40),'CAL-1043'),
+    K('TL-003','Hioki 3280-10 Clamp Meter','Test & Measure','AMP','out','Chan Dara',T-1*DAY,addD(2),12,addD(-330),'CAL-8817'),
+    K('TL-004','Torque Wrench 40-200Nm','Mechanical','CHT','in','',null,null,6,addD(-160),'CAL-7702'),
+    K('TL-005','Torque Wrench 10-60Nm','Mechanical','SVC','out','Vann Rithy',T-9*DAY,addD(-4),6,addD(-95),'CAL-7703'),
+    K('TL-006','Megger MIT525 HV Insulation','Test & Measure','TMP','in','',null,null,12,addD(-355),'CAL-2288'),
+    K('TL-007','FLIR E8 Thermal Camera','Test & Measure','AMP','out','Nhem Sovann',T-2*DAY,addD(5),24,addD(-500),'CAL-3390'),
+    K('TL-008','Hydraulic Crimper 16-400mm²','Mechanical','CHT','in','',null,null,0,null,''),
+    K('TL-009','Cable Fault Locator TDR','Test & Measure','TMP','maint','',null,null,12,addD(-200),'CAL-5561'),
+    K('TL-010','Gas Detector 4-in-1','Safety','SVC','in','',null,null,6,addD(-170),'CAL-6640'),
+    K('TL-011','Insulated Tool Set 1000V (24pc)','Mechanical','SNA','out','Keo Sophal',T-14*DAY,addD(-8),0,null,''),
+    K('TL-012','Fibre Fusion Splicer','Comms','TMP','in','',null,null,24,addD(-410),'CAL-4415'),
+    K('TL-013','Battery Internal Resistance Tester','Test & Measure','CHT','in','',null,null,12,addD(-320),'CAL-9034'),
+    K('TL-014','Laser Distance Meter 80m','Mechanical','TMP','in','',null,null,24,addD(-90),'CAL-1177'),
+    K('TL-015','Arc Flash PPE Kit Cat.2','Safety','CHT','out','Sok Piseth',T-5*DAY,addD(9),12,addD(-140),'CAL-2050'),
+    K('TL-016','Power Quality Analyser PQ3198','Test & Measure','SNA','in','',null,null,12,addD(-370),'CAL-6688')
+  ];
+  const find=sku=>parts.find(p=>p.sku===sku);
+
+  // supplier warranty by category (months); consumables carry none
+  const warCat={Battery:60,PCS:36,HVAC:24,Electrical:24,Fire:24,Comms:12,Mechanical:12,Consumable:0};
+  parts.forEach(p=>{
+    p.war=warCat[p.cat]!==undefined?warCat[p.cat]:12;
+    // warranty clock starts at the last goods-in; spread across 0–115% of the term
+    p.warFrom=p.war?addD(-Math.floor(Math.random()*p.war*30*1.15)):null;
+  });
+  // guarantee a few of each state so the demo shows real cases
+  const forceWar=(sku,pct)=>{const p=find(sku);if(p&&p.war)p.warFrom=addD(-Math.round(p.war*30*pct));};
+  forceWar('BAT-BMU-V2',1.08);   // expired
+  forceWar('PCS-IGBT-M',1.22);   // expired
+  forceWar('HVA-COMP-5T',0.96);  // expiring soon
+  forceWar('ELE-CB-630',0.94);   // expiring soon
+  forceWar('COM-SW-8P',0.97);    // expiring soon
+  forceWar('BAT-LFP-280',0.15);  // well covered
+  tools.forEach(t=>{ t.war=24; t.warFrom=addD(-Math.floor(Math.random()*30*30)); });
+  tools[3].warFrom=addD(-Math.round(24*30*0.95));  // expiring soon
+  tools[8].warFrom=addD(-Math.round(24*30*1.3));   // expired
+
+  const pos=[
+    {id:uid('po'),no:'PO-2608-014',sup:'Sungrow SEA',site:'SVC',status:'ordered',created:T-9*DAY,
+      eta:addD(11),by:'storekeeper',notes:'Urgent — SHV PCS-3 fan failure.',
+      lines:[{part:find('PCS-FAN-24').id,qty:12,cost:34},{part:find('PCS-IGBT-M').id,qty:2,cost:780}]},
+    {id:uid('po'),no:'PO-2608-013',sup:'Airtech KH',site:'SNA',status:'shipped',created:T-16*DAY,
+      eta:addD(2),by:'storekeeper',notes:'Quarterly HVAC filter stock.',
+      lines:[{part:find('HVA-FLT-G4').id,qty:24,cost:12}]},
+    {id:uid('po'),no:'PO-2608-012',sup:'CATL Asia',site:'CHT',status:'draft',created:T-2*DAY,
+      eta:addD(52),by:'storekeeper',notes:'Awaiting manager approval — long lead item.',
+      lines:[{part:find('BAT-BMU-V2').id,qty:6,cost:310}]},
+    {id:uid('po'),no:'PO-2607-009',sup:'Local Supply',site:'TMP',status:'received',created:T-34*DAY,
+      eta:addD(-6),by:'manager',notes:'',
+      lines:[{part:find('CON-TAG-LOT').id,qty:10,cost:26},{part:find('CON-TORQ-GR').id,qty:6,cost:22}]}
+  ];
+  const techs=['Sok Piseth','Chan Dara','Vann Rithy','Nhem Sovann','Keo Sophal','Ly Sreymom'];
+  const wos=['WO-2280 PCS-2 fan swap','WO-2261 quarterly HVAC service','WO-2243 rack inspection',
+    'WO-2299 fire panel test','WO-2205 DC busbar torque check','WO-2310 comms link repair',
+    'WO-2188 battery module swap','WO-2334 SPD replacement','Routine consumable draw','WO-2277 IR survey'];
+  // consumption history — ~15 months back so week / month / YTD comparisons have a baseline
+  const log=[];
+  const rate={Consumable:6,HVAC:4,Electrical:3,Fire:2,Comms:2,Battery:2,PCS:1,Mechanical:2};
+  for(let d=460;d>=0;d--){
+    const day=new Date(T-d*DAY); day.setHours(0,0,0,0);
+    const dow=day.getDay();
+    if(dow===0&&d>1)continue;                              // store closed Sundays
+    let n=Math.random()<(dow===6?.25:.68)?1+Math.floor(Math.random()*3):0;
+    n=Math.round(n*(1+(460-d)/1200));                      // slow growth as the fleet ages
+    if(d<=1)n=Math.max(n,2);                               // today and yesterday always have movement
+    for(let k=0;k<n;k++){
+      const pool=parts.filter(p=>Math.random()*10<(rate[p.cat]||2));
+      const src=pool.length?pool:parts;
+      const p=src[Math.floor(Math.random()*src.length)];
+      const q=1+Math.floor(Math.random()*(p.cat==='Consumable'||p.unit==='m'?5:2));
+      const who=techs[Math.floor(Math.random()*techs.length)];
+      const wo=wos[Math.floor(Math.random()*wos.length)];
+      const ts=Math.min(day.getTime()+(8+Math.floor(Math.random()*9))*3600e3
+        +Math.floor(Math.random()*3600e3), T-6e4);         // never stamp a movement in the future
+      log.push({id:uid('l'),ts,type:'issue',by:'storekeeper',site:p.site,
+        part:p.id,qty:q,value:+(q*p.cost).toFixed(2),
+        txt:`Issued ${q} × ${p.name} to ${who} (${wo})`});
+    }
+    // deliveries land less often than issues, in bigger batches
+    if(d===0||(dow!==6&&Math.random()<.22)){        // always show a delivery today
+      for(let k=0,r=1+Math.floor(Math.random()*2);k<r;k++){
+        const p=parts[Math.floor(Math.random()*parts.length)];
+        const q=Math.max(2,Math.round(p.min*(0.6+Math.random()*1.4)));
+        const ts=Math.min(day.getTime()+(9+Math.floor(Math.random()*7))*3600e3
+          +Math.floor(Math.random()*3600e3), T-6e4);
+        log.push({id:uid('l'),ts,type:'receive',by:'storekeeper',site:p.site,
+          part:p.id,qty:q,value:+(q*p.cost).toFixed(2),
+          txt:`Received ${q} × ${p.name} into ${p.bin} (${p.sup})`});
+      }
+    }
+  }
+  log.push(
+    {id:uid('l'),ts:T-6*3600e3,type:'checkout',by:'tech',txt:'Checked out Fluke 87V Digital Multimeter — Sok Piseth',site:'CHT'},
+    {id:uid('l'),ts:T-1*DAY,type:'adjust',by:'storekeeper',txt:'Stock count correction: HVAC Filter G4 → 4 pcs',site:'SNA'},
+    {id:uid('l'),ts:T-2*DAY,type:'po',by:'storekeeper',txt:'Created PO-2608-012 — CATL Asia, 1 line',site:'CHT'},
+    {id:uid('l'),ts:T-3*DAY,type:'receive',by:'storekeeper',txt:'Received PO-2607-009 — 16 items into TMP store',site:'TMP'});
+  log.sort((a,b)=>b.ts-a.ts);
+  /* Starter accounts, one per role. Placeholders — add real staff in Settings. */
+  const users=[
+    {u:'manager',p:'manager123',name:'Store Manager',position:'Manager',idCard:'0001',role:'manager',site:'all'},
+    {u:'storekeeper',p:'store123',name:'Store Keeper',position:'Storekeeper',idCard:'0002',role:'storekeeper',site:'all'},
+    {u:'tech',p:'tech123',name:'Site Technician',position:'Engineer',idCard:'0003',role:'tech',site:'all'},
+    {u:'guest',p:'guest123',name:'Read Only',position:'Visitor',idCard:'0004',role:'guest',site:'all'}
+  ];
+  return {v:3,sites,parts,tools,pos,log,users,
+    cfg:{appName:'VoltGrid Store',logo:'',sheetUrl:'',autoSync:false,poSeq:15},
+    session:null};
+}
+
+/* Existing devices carry the old four-site demo codes. Remap rather than wipe. */
+const SITE_MIGRATION={HQ:'TMP',BVT:'CHT',KSP:'AMP',SHV:'SVC'};
+function migrate(s){
+  if(!s||s.v>=3)return s;
+  const fresh=seed();
+  s.sites=fresh.sites;
+  s.users=fresh.users;
+  const map=id=>SITE_MIGRATION[id]||id;
+  (s.parts||[]).forEach(p=>p.site=map(p.site));
+  (s.tools||[]).forEach(t=>t.site=map(t.site));
+  (s.pos||[]).forEach(o=>o.site=map(o.site));
+  (s.log||[]).forEach(l=>{if(l.site)l.site=map(l.site);});
+  (s.users||[]).forEach(u=>{if(u.site&&u.site!=='all')u.site=map(u.site);});
+  if(s.session&&s.session.site)s.session.site=map(s.session.site);
+  s.v=3;
+  return s;
+}
+
+/* ---------- state ---------- */
+let S={}, VIEW={page:'home',site:'all',q:'',cat:'all',stock:'all',tab:'all',catMode:'value',user:null};
+async function save(){S.session=VIEW.user?{u:VIEW.user.u,at:Date.now()}:null; await dbSet(LS_KEY,S);}
+function logIt(type,txt,site,meta){
+  const e={id:uid('l'),ts:Date.now(),type,by:VIEW.user?VIEW.user.u:'system',txt,site:site||VIEW.site};
+  if(meta)Object.assign(e,meta);
+  S.log.unshift(e);
+  if(S.log.length>900)S.log.length=900;
+}
+
+/* ---------- derived ---------- */
+const inSite=o=>VIEW.site==='all'||o.site===VIEW.site;
+function stockState(p){ if(p.qty<=0)return 'out'; if(p.qty<=p.min)return 'low'; return 'ok'; }
+function calState(t){ if(!t.calInt||!t.calNext)return 'na';
+  const d=daysTo(t.calNext); if(d<0)return 'exp'; if(d<=30)return 'due'; return 'ok'; }
+function toolState(t){ if(t.status==='maint')return 'maint';
+  if(t.status==='out')return (t.dueAt&&daysTo(t.dueAt)<0)?'over':'out'; return 'in'; }
+const lowParts=()=>S.parts.filter(p=>inSite(p)&&stockState(p)!=='ok');
+const overTools=()=>S.tools.filter(t=>inSite(t)&&toolState(t)==='over');
+const calDue=()=>S.tools.filter(t=>inSite(t)&&['due','exp'].includes(calState(t)));
+const openPOs=()=>S.pos.filter(o=>inSite(o)&&['draft','ordered','shipped'].includes(o.status));
+const stockValue=()=>S.parts.filter(inSite).reduce((a,p)=>a+p.qty*p.cost,0);
+const partById=id=>S.parts.find(p=>p.id===id);
+const siteName=c=>{const s=S.sites.find(x=>x.id===c);return s?s.name:c;};
+function alertCount(){return lowParts().length+overTools().length+calDue().length+warExpiring().length;}
+
+/* ---------- warranty ---------- */
+function warUntil(o){return (o&&o.war&&o.warFrom)?addD(o.war*30,o.warFrom):null;}
+function warState(o){
+  const u=warUntil(o); if(!u)return 'none';
+  const d=daysTo(u); return d<0?'exp':d<=60?'soon':'ok';
+}
+/** Every warranted item, parts and tools together. */
+function warItems(){
+  return [...S.parts.filter(inSite).map(p=>({kind:'part',o:p,name:p.name,code:p.sku,
+            sub:`${p.qty} ${p.unit} on hand`,val:p.qty*p.cost})),
+          ...S.tools.filter(inSite).map(t=>({kind:'tool',o:t,name:t.name,code:t.code,
+            sub:t.cat,val:0}))]
+    .map(x=>({...x,st:warState(x.o),until:warUntil(x.o)}));
+}
+const warExpiring=()=>warItems().filter(x=>x.st==='soon');
+const warExpired=()=>warItems().filter(x=>x.st==='exp');
+
+/* ---------- stock flow (issued out / received in) ---------- */
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function weekStart(){const d=today();return new Date(d.getTime()-((d.getDay()+6)%7)*DAY);}
+function monthStart(){const d=today();return new Date(d.getFullYear(),d.getMonth(),1);}
+function yearStart(){const d=today();return new Date(d.getFullYear(),0,1);}
+/** Movements of one type between two timestamps, scoped to the selected site. */
+function flow(type,from,to){
+  const a=+from, b=to==null?Date.now()+DAY:+to;
+  const L=S.log.filter(l=>l.type===type&&l.qty&&(VIEW.site==='all'||l.site===VIEW.site)&&l.ts>=a&&l.ts<b);
+  return {qty:L.reduce((s,l)=>s+l.qty,0), val:L.reduce((s,l)=>s+(l.value||0),0), n:L.length, lines:L};
+}
+const use=(f,t)=>flow('issue',f,t);          // parts issued out of the store
+const stockIn=(f,t)=>flow('receive',f,t);    // goods booked in
+/** Same elapsed span in the previous week / month / year, so partial periods compare fairly. */
+function flowPrev(type,kind){
+  const now=Date.now();
+  if(kind==='week'){const w=+weekStart();return flow(type,w-7*DAY, w-7*DAY+(now-w));}
+  if(kind==='month'){const m=monthStart(), el=now-m;
+    const pm=new Date(m.getFullYear(),m.getMonth()-1,1); return flow(type,pm, +pm+el);}
+  const y=yearStart(), el=now-y, py=new Date(y.getFullYear()-1,0,1);
+  return flow(type,py, +py+el);
+}
+const usePrev=k=>flowPrev('issue',k);
+function delta(cur,prev){
+  if(!prev)return cur?'<span class="up">new</span>':'<span class="fl">no prior data</span>';
+  const p=Math.round((cur-prev)/prev*100);
+  if(Math.abs(p)<1)return '<span class="fl">level</span> vs last period';
+  return `<span class="${p>0?'up':'dn'}">${p>0?'▲':'▼'} ${Math.abs(p)}%</span> vs last period`;
+}
+/** Value in and out per calendar month for the last n months, oldest first. */
+function byMonth(n){
+  const out=[], d=today();
+  for(let i=n-1;i>=0;i--){
+    const s=new Date(d.getFullYear(),d.getMonth()-i,1), e=new Date(d.getFullYear(),d.getMonth()-i+1,1);
+    const o=use(s,e), inn=stockIn(s,e);
+    out.push({label:MON[s.getMonth()],year:s.getFullYear(),out:o.val,in:inn.val,
+      outQty:o.qty,inQty:inn.qty,now:i===0});
+  }
+  return out;
+}
+const useByMonth=n=>byMonth(n);
+/** Most-consumed parts in a window, by value. */
+function topUsed(from,limit){
+  const m={};
+  use(from).lines.forEach(l=>{
+    if(!m[l.part])m[l.part]={qty:0,val:0};
+    m[l.part].qty+=l.qty; m[l.part].val+=l.value||0;
+  });
+  return Object.entries(m).map(([id,v])=>({p:partById(id),...v}))
+    .filter(x=>x.p).sort((a,b)=>b.val-a.val).slice(0,limit||5);
+}
+
+/* ---------- ui helpers ---------- */
+let toastT;
+function toast(msg,kind){const t=$('#toast');t.textContent=msg;t.className='toast on'+(kind?' '+kind:'');
+  clearTimeout(toastT);toastT=setTimeout(()=>t.className='toast',2400);}
+function closeModal(){$('#mask').classList.remove('on');$('#modal').innerHTML='';}
+function openModal(title,sub,body,footer){
+  $('#modal').innerHTML=`<div class="m-h"><div><div class="m-t">${esc(title)}</div>
+    ${sub?`<div class="m-s">${esc(sub)}</div>`:''}</div><button class="m-x" onclick="closeModal()">✕</button></div>
+    <div class="m-b">${body}</div>${footer?`<div class="m-f">${footer}</div>`:''}`;
+  $('#mask').classList.add('on');
+  const f=$('#modal').querySelector('input:not([type=file]),select,textarea'); if(f&&window.innerWidth>860)setTimeout(()=>f.focus(),60);
+}
+$('#mask').addEventListener('click',e=>{if(e.target.id==='mask')closeModal();});
+function closeMenu(){$('#menu').classList.remove('on');}
+function openMenu(anchor,html){
+  const m=$('#menu'); m.innerHTML=html; m.classList.add('on');
+  const r=anchor.getBoundingClientRect(), w=m.offsetWidth, h=m.offsetHeight;
+  let l=Math.min(r.left, window.innerWidth-w-10), t=r.bottom+6;
+  if(t+h>window.innerHeight-10)t=Math.max(10,r.top-h-6);
+  m.style.left=Math.max(10,l)+'px'; m.style.top=t+'px';
+}
+document.addEventListener('click',e=>{if(!e.target.closest('#menu')&&!e.target.closest('[data-menu]'))closeMenu();});
+
+function sbar(p){
+  const st=stockState(p), span=Math.max(p.min*2, p.qty, 1);
+  const w=Math.min(100, p.qty/span*100), mk=Math.min(100, p.min/span*100);
+  return `<div class="sb ${st==='ok'?'':st}"><i style="width:${w}%"></i>${p.min>0?`<u style="left:${mk}%"></u>`:''}</div>`;
+}
+const stPill=st=>({ok:'<span class="pill ok">In stock</span>',low:'<span class="pill low">Low</span>',
+  out:'<span class="pill out">Out</span>'}[st]);
+const tlPill=st=>({in:'<span class="pill ok">Available</span>',out:'<span class="pill ord">Checked out</span>',
+  over:'<span class="pill out">Overdue</span>',maint:'<span class="pill mute">In service</span>'}[st]);
+const calPill=st=>({ok:'<span class="pill ok">Valid</span>',due:'<span class="pill low">Due soon</span>',
+  exp:'<span class="pill out">Expired</span>',na:'<span class="pill mute">Not required</span>'}[st]);
+const poPill=s=>({draft:'<span class="pill mute">Draft</span>',ordered:'<span class="pill ord">Ordered</span>',
+  shipped:'<span class="pill br">In transit</span>',received:'<span class="pill ok">Received</span>',
+  cancelled:'<span class="pill out">Cancelled</span>'}[s]);
+const empty=(i,t,s)=>`<div class="empty"><div class="e-i">${i}</div><div class="e-t">${esc(t)}</div><div class="e-s">${esc(s||'')}</div></div>`;
+
+/* Dashboard lists show at most 5 rows, then hand off to the full view. */
+const ROWCAP=5;
+function moreRow(total,label,action){
+  if(total<=ROWCAP)return '';
+  return `<button class="morerow" onclick="${action}">View all ${total} ${label}
+    <span>+${total-ROWCAP} more</span></button>`;
+}
+function goLog(type){
+  VIEW.page='log'; VIEW.q=''; VIEW.cat='all'; VIEW.stock='all'; VIEW.tab=type||'all';
+  $('#rail').classList.remove('on'); $('#scrim').classList.remove('on');
+  closeModal(); buildNav(); render(); window.scrollTo(0,0);
+}
+
+/* ---------- photos ----------
+   Images live in their own IndexedDB record, not inside the main state, so
+   routine saves stay small and fast. A part or tool holds either a photo id
+   (uploaded, compressed) or an http(s) link. */
+const PH_KEY='voltgrid_store_photos';
+const PH_MAX=640, PH_Q=0.72, PH_BUDGET=4.2*1024*1024;
+let PH={};
+function photoSrc(o){
+  if(!o||!o.photo)return null;
+  return /^https?:\/\//i.test(o.photo)?o.photo:(PH[o.photo]||null);
+}
+const photoBytes=()=>Object.values(PH).reduce((a,s)=>a+s.length,0);
+async function savePhotos(){await dbSet(PH_KEY,PH);}
+function anyById(id){return partById(id)||S.tools.find(t=>t.id===id)||null;}
+/** Downscale and re-encode so a 4 MB phone photo lands around 40–70 KB. */
+function shrinkImage(file){
+  return new Promise((res,rej)=>{
+    if(!/^image\//.test(file.type))return rej(new Error('That file is not an image'));
+    const r=new FileReader();
+    r.onerror=()=>rej(new Error('Could not read that file'));
+    r.onload=e=>{
+      const img=new Image();
+      img.onerror=()=>rej(new Error('Could not open that image'));
+      img.onload=()=>{
+        try{
+          let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+          const sc=Math.min(1,PH_MAX/Math.max(w,h));
+          w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc));
+          const c=document.createElement('canvas'); c.width=w; c.height=h;
+          const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,w,h); x.drawImage(img,0,0,w,h);
+          res(c.toDataURL('image/jpeg',PH_Q));
+        }catch(err){rej(new Error('Could not process that image'));}
+      };
+      img.src=e.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function thumb(o,fallback,cls){
+  const src=photoSrc(o);
+  return src
+    ?`<img class="th ${cls||''}" src="${esc(src)}" alt="" loading="lazy"
+        onclick="event.stopPropagation();viewPhoto('${o.id}')"
+        onerror="this.outerHTML='<div class=\\'th ph0 ${cls||''}\\'>?</div>'">`
+    :`<div class="th ph0 ${cls||''}">${esc((fallback||'—').slice(0,2).toUpperCase())}</div>`;
+}
+function viewPhoto(id){
+  const o=anyById(id), src=photoSrc(o);
+  if(!src)return toast('No photo on this item yet');
+  openModal(o.name,o.sku||o.code,
+    `<img src="${esc(src)}" alt="" style="width:100%;border-radius:10px;display:block">
+     <div style="font-size:11.5px;color:var(--ink3);margin-top:10px">
+       ${/^https?:/i.test(o.photo)?'Linked image · '+esc(o.photo.slice(0,60)):'Stored on this device'}</div>`,
+    `<button class="btn" onclick="closeModal()">Close</button>`);
+}
+function tick(){const d=new Date();
+  $('#lkTime').textContent=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  $('#lkDate').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+setInterval(tick,1000);tick();
+$('#lkEye').onclick=()=>{const i=$('#lkPass');const s=i.type==='password';i.type=s?'text':'password';$('#lkEye').textContent=s?'Hide':'Show';};
+$$('.lk-chip').forEach(b=>b.onclick=()=>{$('#lkUser').value=b.dataset.u;$('#lkPass').value=b.dataset.p;$('#lkErr').classList.add('hide');});
+$('#lkGo').onclick=doLogin;
+$('#lkPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+$('#lkUser').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lkPass').focus();});
+function doLogin(){
+  const u=$('#lkUser').value.trim().toLowerCase(), p=$('#lkPass').value;
+  const acc=S.users.find(x=>x.u===u&&x.p===p);
+  if(!acc){const e=$('#lkErr');e.textContent='Username or password is not correct. Check and try again.';
+    e.classList.remove('hide');$('#lkPass').value='';return;}
+  $('#lkErr').classList.add('hide'); $('#lkPass').value=''; $('#lkUser').value='';
+  enter(acc);
+}
+function enter(acc){
+  VIEW.user=acc;
+  VIEW.site=acc.site&&acc.site!=='all'?acc.site:'all';
+  VIEW.page=ROLES[acc.role].pages[0];
+  $('#lock').classList.add('gone'); $('#app').classList.add('on');
+  $('#meBtn').textContent=acc.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+  buildSites(); buildNav(); render(); save();
+}
+function signOut(){closeMenu();closeModal();VIEW.user=null;S.session=null;dbSet(LS_KEY,S);
+  $('#app').classList.remove('on'); $('#lock').classList.remove('gone'); tick();}
+
+/* ---------- chrome ---------- */
+function brand(){
+  const c=S.cfg, ini=(c.appName||'VG').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+  ['lk','rl'].forEach(k=>{
+    const holder=$('#'+k+'Logo');
+    if(c.logo){holder.outerHTML=`<img id="${k}Logo" src="${c.logo}" alt="">`;}
+    else{holder.outerHTML=`<div id="${k}Logo" class="${k==='lk'?'lk-mark':'rail-mark'}">${esc(ini)}</div>`;}
+  });
+  $('#lkName').textContent=c.appName; $('#rlName').textContent=c.appName;
+  document.title=c.appName+' — Spare Parts & Tools';
+}
+function siteStats(id){
+  const P=S.parts.filter(p=>id==='all'||p.site===id);
+  const T=S.tools.filter(t=>id==='all'||t.site===id);
+  const low=P.filter(p=>stockState(p)!=='ok').length;
+  const over=T.filter(t=>toolState(t)==='over').length;
+  const cal=T.filter(t=>['due','exp'].includes(calState(t))).length;
+  return {parts:P.length,tools:T.length,low,over,cal,alerts:low+over+cal};
+}
+function mySites(){
+  const lock=VIEW.user.site&&VIEW.user.site!=='all';
+  return S.sites.filter(s=>!lock||s.id===VIEW.user.site);
+}
+function buildSites(){
+  const lock=VIEW.user.site&&VIEW.user.site!=='all';
+  if(lock&&VIEW.site!==VIEW.user.site)VIEW.site=VIEW.user.site;
+  if(!lock&&VIEW.site!=='all'&&!S.sites.some(s=>s.id===VIEW.site))VIEW.site='all';
+  const cur=VIEW.site==='all'?null:S.sites.find(s=>s.id===VIEW.site);
+  const st=siteStats(VIEW.site);
+  $('#siteBtn').innerHTML=`<span class="cd">${cur?esc(cur.code):'ALL'}</span>
+    <span class="nm">${cur?esc(cur.name):'All warehouses'}</span>
+    ${st.alerts?'<span class="wd"></span>':''}<span class="cv">▾</span>`;
+  const ps=$('#pgSite'); if(ps)ps.textContent=cur?cur.name:`All warehouses · ${S.sites.length} locations`;
+}
+function siteSheet(){
+  const lock=VIEW.user.site&&VIEW.user.site!=='all';
+  const row=(id,code,name,sub)=>{
+    const st=siteStats(id), on=VIEW.site===id;
+    return `<button class="siterow ${on?'on':''}" onclick="setSite('${id}')">
+      <span class="cd">${esc(code)}</span>
+      <span style="min-width:0;flex:1"><span class="nm">${esc(name)}</span>
+        <span class="mt">${sub||`${st.parts} parts · ${st.tools} tools`}</span></span>
+      <span class="tk">${st.alerts?`<span class="pill ${st.low||st.over?'out':'low'}">${st.alerts} alert${st.alerts>1?'s':''}</span>`
+        :'<span class="pill ok">clear</span>'}
+        ${on?'<div style="color:var(--brand);font-weight:700;font-size:12px;margin-top:4px">Selected</div>':''}</span>
+    </button>`;};
+  openModal('Warehouse',lock?'You have access to one location':'Choose which location to view',
+    `<div style="margin:-16px">
+      ${lock?'':row('all','ALL','All warehouses',`${S.parts.length} parts · ${S.tools.length} tools across ${S.sites.length} sites`)}
+      ${mySites().map(s=>row(s.id,s.code,s.name)).join('')}
+    </div>`,`<button class="btn" onclick="closeModal()">Close</button>`);
+}
+function setSite(id){VIEW.site=id;closeModal();buildSites();buildNav();render();}
+$('#siteBtn').onclick=siteSheet;
+function buildNav(){
+  const pages=ROLES[VIEW.user.role].pages;
+  const b={parts:lowParts().length, tools:overTools().length, cal:calDue().length,
+    war:warExpiring().length+warExpired().length, po:openPOs().filter(o=>o.status==='draft').length};
+  $('#nav').innerHTML=NAV.map(n=>{
+    if(n.g)return NAV.filter(x=>x.id&&pages.includes(x.id)).length?`<div class="nav-lbl">${n.g}</div>`:'';
+    if(!pages.includes(n.id))return '';
+    const c=b[n.id]||0, amber=n.id==='cal'||n.id==='po'||n.id==='war';
+    return `<a data-p="${n.id}" class="${VIEW.page===n.id?'on':''}"><span class="ic">${n.ic}</span>${n.t}
+      ${c?`<span class="bdg ${amber?'amber':''}">${c}</span>`:''}</a>`;
+  }).join('');
+  $$('#nav a').forEach(a=>a.onclick=()=>go(a.dataset.p));
+  const n=alertCount(); $('#alertDot').classList.toggle('hide',!n);
+}
+function go(p){VIEW.page=p;VIEW.q='';VIEW.cat='all';VIEW.stock='all';VIEW.tab='all';
+  $('#rail').classList.remove('on');$('#scrim').classList.remove('on');
+  buildNav();render();window.scrollTo(0,0);}
+$('#burger').onclick=()=>{$('#rail').classList.toggle('on');$('#scrim').classList.toggle('on');};
+$('#scrim').onclick=()=>{$('#rail').classList.remove('on');$('#scrim').classList.remove('on');};
+$('#meBtn').onclick=e=>{e.stopPropagation();
+  const u=VIEW.user;
+  openMenu(e.currentTarget,`<div class="mh">${esc(u.name)} · ${ROLES[u.role].label}</div>
+    <button onclick="closeMenu();go('log')">≡ Activity log</button>
+    ${ROLES[u.role].pages.includes('admin')?'<button onclick="closeMenu();go(\'admin\')">⚙ Settings</button>':''}
+    <button onclick="closeMenu();pwModal()">⚿ Change password</button>
+    <div class="div"></div><button class="dgr" onclick="signOut()">⏻ Sign out</button>`);};
+$('#alertBtn').onclick=e=>{e.stopPropagation();alertsModal();};
+
+/* ================= RENDER ================= */
+const TITLES={home:'Overview',parts:'Spare Parts',tools:'Tools',cal:'Calibration & Inspection',war:'Warranty',
+  po:'Purchase Orders',log:'Activity Log',admin:'Settings'};
+function render(){
+  if(!ROLES[VIEW.user.role].pages.includes(VIEW.page))VIEW.page=ROLES[VIEW.user.role].pages[0];
+  $('#pgTitle').textContent=TITLES[VIEW.page];
+  buildSites();
+  $('#page').innerHTML=({home:pgHome,parts:pgParts,tools:pgTools,cal:pgCal,war:pgWar,po:pgPo,log:pgLog,admin:pgAdmin})[VIEW.page]();
+  bind();
+  $('#alertDot').classList.toggle('hide',!alertCount());
+}
+function bind(){
+  $$('[data-go]').forEach(el=>el.onclick=()=>go(el.dataset.go));
+  const q=$('#q'); if(q){q.oninput=e=>{VIEW.q=e.target.value;repaint();};}
+  $$('[data-filter]').forEach(el=>el.onchange=e=>{VIEW[el.dataset.filter]=e.target.value;repaint();});
+  $$('[data-tab]').forEach(el=>el.onclick=()=>{VIEW.tab=el.dataset.tab;render();});
+}
+function repaint(){
+  const host=$('#listHost'); if(!host){render();return;}
+  host.innerHTML=({parts:partsList,tools:toolsList,cal:calList,war:warList,po:poList,log:logList})[VIEW.page]();
+}
+
+/* ---------- OVERVIEW ---------- */
+function pgHome(){
+  const low=lowParts(), outp=low.filter(p=>stockState(p)==='out');
+  const ov=overTools(), cd=calDue(), op=openPOs();
+  const toolsOut=S.tools.filter(t=>inSite(t)&&t.status==='out').length;
+  const recent=S.log.filter(l=>VIEW.site==='all'||l.site===VIEW.site);
+  const parts=S.parts.filter(inSite);
+  const alerts=[
+    ...outp.map(p=>({k:'out',i:'▤',t:p.name,s:`${p.sku} · ${siteName(p.site)}`,r:'0 '+p.unit,go:'parts'})),
+    ...ov.map(t=>({k:'out',i:'⚒',t:t.name,s:`${t.code} · ${t.holder}`,r:Math.abs(daysTo(t.dueAt))+'d late',go:'tools'})),
+    ...cd.filter(t=>calState(t)==='exp').map(t=>({k:'out',i:'◎',t:t.name,s:`${t.code} · cert ${t.cert||'—'}`,r:'expired',go:'cal'})),
+    ...low.filter(p=>stockState(p)==='low').map(p=>({k:'low',i:'▤',t:p.name,s:`${p.sku} · min ${p.min}`,r:p.qty+' '+p.unit,go:'parts'})),
+    ...cd.filter(t=>calState(t)==='due').map(t=>({k:'low',i:'◎',t:t.name,s:`${t.code} · due ${fmtD(t.calNext)}`,r:daysTo(t.calNext)+'d',go:'cal'})),
+    ...warExpiring().map(x=>({k:'low',i:'▣',t:x.name,s:`${x.code} · warranty ends ${fmtD(x.until)}`,r:daysTo(x.until)+'d',go:'war'}))
+  ];
+  const acts=[];
+  if(can('issue'))acts.push(`<button class="btn pri" onclick="issueModal()">▤ Issue parts</button>`);
+  if(can('checkout'))acts.push(`<button class="btn" onclick="checkoutModal()">⚒ Check out tool</button>`);
+  if(can('receive'))acts.push(`<button class="btn" onclick="receiveModal()">↓ Receive stock</button>`);
+  if(can('po'))acts.push(`<button class="btn" onclick="poModal()">⇄ New purchase order</button>`);
+
+  return `
+  <div class="kpis">
+    <button class="kpi br" data-go="parts"><div class="kpi-l">Stock value</div>
+      <div class="kpi-v">${'$'+Math.round(stockValue()).toLocaleString()}</div>
+      <div class="kpi-d">${parts.length} line items</div></button>
+    <button class="kpi ${outp.length?'out':'ok'}" data-go="parts"><div class="kpi-l">Below minimum</div>
+      <div class="kpi-v">${low.length}</div>
+      <div class="kpi-d">${outp.length} at zero stock</div></button>
+    <button class="kpi ${ov.length?'out':'ok'}" data-go="tools"><div class="kpi-l">Tools out</div>
+      <div class="kpi-v">${toolsOut}</div>
+      <div class="kpi-d">${ov.length} past due date</div></button>
+    <button class="kpi ${cd.length?'low':'ok'}" data-go="cal"><div class="kpi-l">Calibration due</div>
+      <div class="kpi-v">${cd.length}</div>
+      <div class="kpi-d">${cd.filter(t=>calState(t)==='exp').length} already expired</div></button>
+    <button class="kpi ord" data-go="po"><div class="kpi-l">Open orders</div>
+      <div class="kpi-v">${op.length}</div>
+      <div class="kpi-d">${money(op.reduce((a,o)=>a+o.lines.reduce((b,l)=>b+l.qty*l.cost,0),0))} committed</div></button>
+    <button class="kpi ${warExpiring().length?'low':'ok'}" data-go="war"><div class="kpi-l">Warranty expiring</div>
+      <div class="kpi-v">${warExpiring().length}</div>
+      <div class="kpi-d">${warExpired().length} already expired</div></button>
+  </div>
+
+  ${acts.length?`<div class="card"><div class="card-b" style="display:flex;gap:8px;flex-wrap:wrap">${acts.join('')}</div></div>`:''}
+
+  ${useBlock()}
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-h"><div><div class="card-t">Needs attention</div>
+        <div class="card-s">${alerts.length?alerts.length+' open items':'Everything is within limits'}</div></div></div>
+      <div class="card-b flush">
+        ${alerts.length?alerts.slice(0,ROWCAP).map(a=>`<button class="al" data-go="${a.go}">
+          <div class="al-i ${a.k}">${a.i}</div>
+          <div style="min-width:0"><div class="al-t">${esc(a.t)}</div><div class="al-s">${esc(a.s)}</div></div>
+          <div class="al-r"><span class="pill ${a.k}">${esc(a.r)}</span></div></button>`).join('')
+          +moreRow(alerts.length,'open items','alertsModal()')
+        :empty('✓','All clear','No low stock, overdue tools or expired certificates.')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div><div class="card-t">Recent movements</div>
+        <div class="card-s">Last stock and tool transactions</div></div></div>
+      <div class="card-b flush">
+        ${recent.length?recent.slice(0,ROWCAP).map(l=>`
+        <div class="al"><div class="al-i br">${({issue:'↑',receive:'↓',adjust:'≠',checkout:'⚒',checkin:'↩',po:'⇄',cal:'◎',edit:'✎',add:'＋',del:'✕'}[l.type]||'•')}</div>
+          <div style="min-width:0"><div class="al-t" style="font-weight:500">${esc(l.txt)}</div>
+          <div class="al-s">${esc(l.by)} · ${ago(l.ts)}</div></div></div>`).join('')
+          +moreRow(recent.length,'movements',"goLog('all')")
+        :empty('≡','No activity yet','')}
+      </div>
+    </div>
+  </div>
+
+  ${catBlock()}`;
+}
+
+/* ---------- stock by category ---------- */
+function catBlock(){
+  const parts=S.parts.filter(inSite);
+  const byVal=VIEW.catMode!=='items';
+  const cats=[...new Set(parts.map(p=>p.cat))].map(c=>{
+    const g=parts.filter(p=>p.cat===c);
+    const bad=g.filter(p=>stockState(p)!=='ok');
+    return {c, items:g.length, qty:g.reduce((a,p)=>a+p.qty,0),
+      val:g.reduce((a,p)=>a+p.qty*p.cost,0),
+      riskVal:bad.reduce((a,p)=>a+p.qty*p.cost,0),
+      low:g.filter(p=>stockState(p)==='low').length,
+      out:g.filter(p=>stockState(p)==='out').length};
+  }).sort((a,b)=>byVal?b.val-a.val:b.items-a.items);
+
+  const totVal=cats.reduce((a,x)=>a+x.val,0), totItems=cats.reduce((a,x)=>a+x.items,0);
+  const tot=byVal?totVal:totItems;
+
+  return `<div class="card">
+    <div class="card-h"><div><div class="card-t">Stock by category</div>
+      <div class="card-s">${VIEW.site==='all'?'All warehouses':siteName(VIEW.site)} ·
+        ${money(totVal).replace('.00','')} across ${totItems} line items</div></div>
+      <div class="r"><div class="seg">
+        <button class="${byVal?'on':''}" onclick="setCatMode('value')">By value</button>
+        <button class="${byVal?'':'on'}" onclick="setCatMode('items')">By count</button>
+      </div></div></div>
+    <div class="card-b flush">
+      ${cats.length?cats.map(x=>{
+        const mine=byVal?x.val:x.items, risk=byVal?x.riskVal:(x.low+x.out);
+        const share=tot?mine/tot*100:0, riskShare=mine?risk/mine*100:0;
+        return `<button class="catrow" onclick="goCat('${esc(x.c)}')">
+          <span class="cat-n"><b>${esc(x.c)}</b>
+            <span>${x.items} item${x.items>1?'s':''} · ${x.qty} units</span></span>
+          <span class="cat-b">
+            <span class="stack" title="${money(x.val)} total, ${money(x.riskVal)} below minimum">
+              <i class="g" style="width:${share*(100-riskShare)/100}%"></i>
+              <i class="r" style="width:${share*riskShare/100}%"></i></span>
+            ${(x.low||x.out)?`<span class="cat-chips">
+              ${x.out?`<span class="pill out">${x.out} out</span>`:''}
+              ${x.low?`<span class="pill low">${x.low} low</span>`:''}</span>`:''}
+          </span>
+          <span class="cat-v"><b>${byVal?money(x.val).replace('.00',''):x.items}</b>
+            <span>${Math.round(share)}% of ${byVal?'value':'lines'}</span></span>
+        </button>`;}).join('')
+      :empty('▤','No parts at this warehouse','Add stock or switch warehouse to see the breakdown.')}
+    </div>
+    <div class="card-b" style="border-top:1px solid var(--line);font-size:11.5px;color:var(--ink2)">
+      Bar length is each category's share of ${byVal?'total stock value':'total line items'};
+      the red segment is the portion sitting at or below minimum. Tap a row to open that category.
+    </div>
+  </div>`;
+}
+function setCatMode(m){VIEW.catMode=m;render();}
+function goCat(c){
+  VIEW.page='parts'; VIEW.q=''; VIEW.stock='all'; VIEW.tab='all'; VIEW.cat=c;
+  $('#rail').classList.remove('on'); $('#scrim').classList.remove('on');
+  buildNav(); render(); window.scrollTo(0,0);
+}
+
+/* ---------- consumption + goods in ---------- */
+function useBlock(){
+  const w=use(weekStart()), m=use(monthStart()), y=use(yearStart());
+  const iw=stockIn(weekStart()), im=stockIn(monthStart()), iy=stockIn(yearStart());
+  const d=today(), wkDays=((d.getDay()+6)%7)+1, moDays=d.getDate();
+  const doy=Math.floor((d-yearStart())/DAY)+1;
+  const bars=byMonth(12), peak=Math.max(...bars.map(b=>Math.max(b.in,b.out)),1);
+  const top=topUsed(monthStart(),5), topMax=Math.max(...top.map(t=>t.val),1);
+  const burn=y.val/Math.max(doy,1)*30.4;
+  const cover=burn>0?(stockValue()/burn).toFixed(1):'—';
+  const net=(a,b)=>{const n=a-b;
+    return `<span class="${n<0?'up':'dn'}">${n<0?'▼':'▲'} ${money(Math.abs(n)).replace('.00','')}</span> ${n<0?'net drawdown':'net build-up'}`;};
+
+  const card=(lbl,u,prev,sub,cls)=>`<div class="kpi ${cls}">
+    <div class="kpi-l">${lbl}</div>
+    <div class="kpi-v">${money(u.val).replace('.00','')}</div>
+    <div class="kpi-d">${u.qty} items · ${u.n} movement${u.n===1?'':'s'}</div>
+    <div class="kpi-d">${delta(u.val,prev.val)}</div>
+    <div class="kpi-d" style="color:var(--ink3)">${sub}</div></div>`;
+
+  return `
+  <div class="card">
+    <div class="card-h"><div><div class="card-t">Consumption — stock out</div>
+      <div class="card-s">Parts issued from the store · ${VIEW.site==='all'?'all warehouses':siteName(VIEW.site)}</div></div>
+      <div class="r"><button class="btn sm" data-go="log">Movements</button></div></div>
+    <div class="card-b">
+      <div class="kpis" style="margin-bottom:0">
+        ${card('This week',w,usePrev('week'),`Mon–today · day ${wkDays} of 7`,'br')}
+        ${card('This month',m,usePrev('month'),`1–${moDays} ${MON[d.getMonth()]} ${d.getFullYear()}`,'ord')}
+        ${card('Year to date',y,usePrev('year'),`1 Jan – ${moDays} ${MON[d.getMonth()]} · day ${doy}`,'ok')}
+        <div class="kpi low"><div class="kpi-l">Avg burn rate</div>
+          <div class="kpi-v">${money(burn).replace('.00','')}</div>
+          <div class="kpi-d">per month, YTD average</div>
+          <div class="kpi-d">${Math.round(y.qty/Math.max(doy,1)*30.4)} items / month</div>
+          <div class="kpi-d" style="color:var(--ink3)">${cover} months of cover on hand</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><div><div class="card-t">New stock in</div>
+      <div class="card-s">Goods received and booked into the store</div></div>
+      <div class="r">${can('receive')?'<button class="btn sm pri" onclick="receiveModal()">Receive stock</button>':''}</div></div>
+    <div class="card-b">
+      <div class="kpis" style="margin-bottom:0">
+        ${card('This week',iw,flowPrev('receive','week'),net(iw.val,w.val),'br')}
+        ${card('This month',im,flowPrev('receive','month'),net(im.val,m.val),'ord')}
+        ${card('Year to date',iy,flowPrev('receive','year'),net(iy.val,y.val),'ok')}
+        <div class="kpi ${iy.val<y.val?'out':'ok'}"><div class="kpi-l">Replenishment ratio</div>
+          <div class="kpi-v">${y.val?Math.round(iy.val/y.val*100):0}%</div>
+          <div class="kpi-d">received vs issued, YTD</div>
+          <div class="kpi-d" style="color:var(--ink3)">${iy.val<y.val
+            ?'Drawing stock down faster than replacing it':'Replacing at or above the burn rate'}</div></div>
+      </div>
+      ${(()=>{const rec=stockIn(weekStart()).lines; if(!rec.length)return '';
+        return `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+          color:var(--ink3);margin:16px 0 2px">Received this week</div>
+        ${rec.slice(0,ROWCAP).map(l=>{const p=partById(l.part);
+          return `<div class="kv"><span style="color:var(--ink)">${esc(p?p.name:'—')}
+            <span class="mono" style="font-size:11px;color:var(--ink3)"> ${p?esc(p.sku):''} · ${esc(l.site)} · ${ago(l.ts)}</span></span>
+            <b class="mono">+${l.qty} ${p?esc(p.unit):''}</b></div>`;}).join('')}
+        ${rec.length>ROWCAP?`<button class="morerow" style="border-radius:8px;margin-top:10px;border:1px solid var(--line)"
+          onclick="goLog('receive')">View all ${rec.length} receipts <span>+${rec.length-ROWCAP} more</span></button>`:''}`;})()}
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-h"><div><div class="card-t">Stock in vs stock out</div>
+        <div class="card-s">Last 12 months by value</div></div></div>
+      <div class="card-b">
+        <div class="bars">${bars.map(b=>`<div class="bcol ${b.now?'now':''}"
+          title="${b.label} ${b.year} — in ${money(b.in)} (${b.inQty}) · out ${money(b.out)} (${b.outQty})">
+          <div class="pair">
+            <i class="bin" style="height:${Math.max(b.in/peak*100,1)}%"></i>
+            <i class="bout" style="height:${Math.max(b.out/peak*100,1)}%"></i></div>
+          <span>${b.label}</span></div>`).join('')}</div>
+        <div class="legend"><span><i style="background:var(--ok)"></i>Received in</span>
+          <span><i style="background:var(--brand)"></i>Issued out</span>
+          <span>${MON[d.getMonth()]} is partial (day ${moDays})</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div><div class="card-t">Top consumers this month</div>
+        <div class="card-s">Where the spend is going</div></div></div>
+      <div class="card-b">
+        ${top.length?`<div class="top5">${top.map(t=>`<div class="t5r">
+          <div class="t5n"><b>${esc(t.p.name)}</b><div class="psku">${esc(t.p.sku)} · ${t.qty} ${esc(t.p.unit)} issued</div></div>
+          <div class="t5b"><div class="sb"><i style="width:${t.val/topMax*100}%"></i></div></div>
+          <div class="t5v">${money(t.val).replace('.00','')}</div></div>`).join('')}</div>`
+        :empty('▤','Nothing issued yet this month','Issued parts appear here as they leave the store.')}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- SPARE PARTS ---------- */
+function pgParts(){
+  const cats=[...new Set(S.parts.map(p=>p.cat))].sort();
+  return `
+  <div class="tools">
+    <div class="srch"><input id="q" placeholder="Search part name, SKU or bin…" value="${esc(VIEW.q)}"></div>
+    <select class="sel" data-filter="cat"><option value="all">All categories</option>
+      ${cats.map(c=>`<option ${VIEW.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <select class="sel" data-filter="stock">
+      <option value="all" ${VIEW.stock==='all'?'selected':''}>All stock</option>
+      <option value="low" ${VIEW.stock==='low'?'selected':''}>Below minimum</option>
+      <option value="out" ${VIEW.stock==='out'?'selected':''}>Out of stock</option>
+      <option value="ok"  ${VIEW.stock==='ok'?'selected':''}>Healthy</option></select>
+    ${can('issue')?'<button class="btn pri" onclick="issueModal()">Issue</button>':''}
+    ${can('receive')?'<button class="btn" onclick="receiveModal()">Receive</button>':''}
+    ${can('edit')?'<button class="btn" onclick="partModal()">＋ Add part</button>':''}
+  </div>
+  <div class="card"><div class="card-b flush" id="listHost">${partsList()}</div></div>`;
+}
+function filterParts(){
+  const q=VIEW.q.toLowerCase();
+  return S.parts.filter(p=>inSite(p))
+   .filter(p=>VIEW.cat==='all'||p.cat===VIEW.cat)
+   .filter(p=>VIEW.stock==='all'||stockState(p)===VIEW.stock||(VIEW.stock==='low'&&stockState(p)==='out'))
+   .filter(p=>!q||(p.name+' '+p.sku+' '+p.bin+' '+p.sup).toLowerCase().includes(q))
+   .sort((a,b)=>{const r={out:0,low:1,ok:2};return r[stockState(a)]-r[stockState(b)]||a.name.localeCompare(b.name);});
+}
+function partsList(){
+  const L=filterParts();
+  if(!L.length)return empty('▤','No parts match','Try clearing the search or filters.');
+  const rowAct=p=>`<button class="btn sm" data-menu onclick="partMenu(event,'${p.id}')">Actions ▾</button>`;
+  return `<table class="tbl"><thead><tr><th style="width:52px"></th><th>Part</th><th>Category</th><th>Bin</th><th>Site</th>
+    <th style="width:150px">Level</th><th class="num">On hand</th><th class="num">Value</th><th>Status</th><th>Warranty</th><th></th></tr></thead><tbody>
+    ${L.map(p=>`<tr><td>${thumb(p,p.cat)}</td>
+      <td><div class="pname">${esc(p.name)}</div><div class="psku">${esc(p.sku)}</div></td>
+      <td style="color:var(--ink2)">${esc(p.cat)}</td><td class="mono" style="font-size:12px">${esc(p.bin)}</td>
+      <td class="mono" style="font-size:12px">${esc(p.site)}</td>
+      <td>${sbar(p)}<div class="sb-lg"><span>min ${p.min}</span><span>${p.sup?esc(p.sup.slice(0,12)):''}</span></div></td>
+      <td class="num"><b>${p.qty}</b> <span style="color:var(--ink3);font-size:11px">${esc(p.unit)}</span></td>
+      <td class="num" style="color:var(--ink2)">${money(p.qty*p.cost)}</td>
+      <td>${stPill(stockState(p))}</td>
+      <td>${warPill(warState(p))}${warUntil(p)?`<div class="psku">${fmtD(warUntil(p))}</div>`:''}</td>
+      <td style="text-align:right">${rowAct(p)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="rows">${L.map(p=>`<div class="row">${thumb(p,p.cat)}<div class="row-m">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1;min-width:0"><div class="pname">${esc(p.name)}</div>
+        <div class="psku">${esc(p.sku)} · ${esc(p.cat)} · bin ${esc(p.bin)}</div></div>
+        ${stPill(stockState(p))}</div>
+      <div style="margin-top:9px">${sbar(p)}
+        <div class="sb-lg"><span>on hand <b style="color:var(--ink)">${p.qty} ${esc(p.unit)}</b> · min ${p.min}</span>
+        <span>${esc(p.site)} · ${money(p.qty*p.cost)}</span></div></div>
+      <div class="row-x">${rowAct(p)}</div></div></div>`).join('')}</div>`;
+}
+function partMenu(e,id){e.stopPropagation();const p=partById(id);
+  openMenu(e.currentTarget,`<div class="mh">${esc(p.sku)}</div>
+   <button onclick="closeMenu();partDetail('${id}')">◉ View details</button>
+   ${can('issue')?`<button onclick="closeMenu();issueModal('${id}')">↑ Issue stock</button>`:''}
+   ${can('receive')?`<button onclick="closeMenu();receiveModal('${id}')">↓ Receive stock</button>`:''}
+   ${can('adjust')?`<button onclick="closeMenu();adjustModal('${id}')">≠ Adjust / stock count</button>`:''}
+   ${can('po')&&stockState(p)!=='ok'?`<button onclick="closeMenu();poModal(null,'${id}')">⇄ Add to purchase order</button>`:''}
+   <button onclick="closeMenu();go('war')">▣ Warranty register</button>
+   ${can('edit')?`<div class="div"></div><button onclick="closeMenu();partModal('${id}')">✎ Edit part</button>`:''}
+   ${can('del')?`<button class="dgr" onclick="closeMenu();delPart('${id}')">✕ Delete part</button>`:''}`);}
+
+/* ---------- TOOLS ---------- */
+function pgTools(){
+  const T=S.tools.filter(inSite);
+  const c={all:T.length,in:T.filter(t=>toolState(t)==='in').length,out:T.filter(t=>t.status==='out').length,
+    over:T.filter(t=>toolState(t)==='over').length,maint:T.filter(t=>t.status==='maint').length};
+  return `
+  <div class="tabs">
+    ${[['all','All tools'],['in','Available'],['out','Checked out'],['over','Overdue'],['maint','In service']]
+      .map(([k,l])=>`<button data-tab="${k}" class="${VIEW.tab===k?'on':''}">${l} ${c[k]?`(${c[k]})`:''}</button>`).join('')}
+  </div>
+  <div class="tools">
+    <div class="srch"><input id="q" placeholder="Search tool, code or holder…" value="${esc(VIEW.q)}"></div>
+    ${can('checkout')?'<button class="btn pri" onclick="checkoutModal()">⚒ Check out</button>':''}
+    ${can('checkout')?'<button class="btn" onclick="checkinModal()">↩ Check in</button>':''}
+    ${can('edit')?'<button class="btn" onclick="toolModal()">＋ Add tool</button>':''}
+  </div>
+  <div class="card"><div class="card-b flush" id="listHost">${toolsList()}</div></div>`;
+}
+function filterTools(){
+  const q=VIEW.q.toLowerCase();
+  return S.tools.filter(inSite)
+    .filter(t=>VIEW.tab==='all'||toolState(t)===VIEW.tab||(VIEW.tab==='out'&&t.status==='out'))
+    .filter(t=>!q||(t.name+' '+t.code+' '+t.holder+' '+t.cat).toLowerCase().includes(q))
+    .sort((a,b)=>{const r={over:0,out:1,maint:2,in:3};return r[toolState(a)]-r[toolState(b)]||a.code.localeCompare(b.code);});
+}
+function toolsList(){
+  const L=filterTools();
+  if(!L.length)return empty('⚒','No tools match','Try another tab or clear the search.');
+  const act=t=>`<button class="btn sm" data-menu onclick="toolMenu(event,'${t.id}')">Actions ▾</button>`;
+  const due=t=>{if(t.status!=='out'||!t.dueAt)return '—';const d=daysTo(t.dueAt);
+    return `<span class="${d<0?'':''}" style="color:${d<0?'var(--out)':'var(--ink)'};font-weight:${d<0?'700':'400'}">${fmtD(t.dueAt)}${d<0?` (${Math.abs(d)}d late)`:''}</span>`;};
+  return `<table class="tbl"><thead><tr><th style="width:52px"></th><th>Tool</th><th>Category</th><th>Site</th><th>Held by</th>
+    <th>Due back</th><th>Calibration</th><th>Status</th><th></th></tr></thead><tbody>
+    ${L.map(t=>`<tr><td>${thumb(t,t.code.replace('TL-',''))}</td>
+      <td><div class="pname">${esc(t.name)}</div><div class="psku">${esc(t.code)}</div></td>
+      <td style="color:var(--ink2)">${esc(t.cat)}</td><td class="mono" style="font-size:12px">${esc(t.site)}</td>
+      <td>${t.holder?esc(t.holder):'<span style="color:var(--ink3)">—</span>'}</td>
+      <td class="mono" style="font-size:12px">${due(t)}</td>
+      <td>${calPill(calState(t))}${t.calNext?`<div class="psku">${fmtD(t.calNext)}</div>`:''}</td>
+      <td>${tlPill(toolState(t))}</td><td style="text-align:right">${act(t)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="rows">${L.map(t=>`<div class="row">${thumb(t,t.code.replace('TL-',''))}<div class="row-m">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1;min-width:0"><div class="pname">${esc(t.name)}</div>
+        <div class="psku">${esc(t.code)} · ${esc(t.cat)} · ${esc(t.site)}</div></div>${tlPill(toolState(t))}</div>
+      ${t.status==='out'?`<div style="margin-top:7px;font-size:12.5px">Held by <b>${esc(t.holder)}</b> ·
+        due <span class="mono" style="color:${daysTo(t.dueAt)<0?'var(--out)':'var(--ink2)'}">${fmtD(t.dueAt)}</span></div>`:''}
+      <div style="margin-top:7px;font-size:12px;color:var(--ink3)">Calibration ${calPill(calState(t))}
+        ${t.calNext?`<span class="mono"> ${fmtD(t.calNext)}</span>`:''}</div>
+      <div class="row-x">${act(t)}</div></div></div>`).join('')}</div>`;
+}
+function toolMenu(e,id){e.stopPropagation();const t=S.tools.find(x=>x.id===id);
+  openMenu(e.currentTarget,`<div class="mh">${esc(t.code)}</div>
+   <button onclick="closeMenu();toolDetail('${id}')">◉ View details</button>
+   ${can('checkout')&&t.status==='in'?`<button onclick="closeMenu();checkoutModal('${id}')">⚒ Check out</button>`:''}
+   ${can('checkout')&&t.status==='out'?`<button onclick="closeMenu();checkinModal('${id}')">↩ Check in</button>`:''}
+   ${can('cal')&&t.calInt?`<button onclick="closeMenu();calModal('${id}')">◎ Record calibration</button>`:''}
+   ${can('edit')?`<button onclick="closeMenu();svcToggle('${id}')">${t.status==='maint'?'✓ Return to service':'⚑ Send for service'}</button>`:''}
+   ${can('edit')?`<div class="div"></div><button onclick="closeMenu();toolModal('${id}')">✎ Edit tool</button>`:''}
+   ${can('del')?`<button class="dgr" onclick="closeMenu();delTool('${id}')">✕ Delete tool</button>`:''}`);}
+
+/* ---------- CALIBRATION ---------- */
+function pgCal(){
+  const T=S.tools.filter(t=>inSite(t)&&t.calInt>0);
+  const c={all:T.length,exp:T.filter(t=>calState(t)==='exp').length,
+    due:T.filter(t=>calState(t)==='due').length,ok:T.filter(t=>calState(t)==='ok').length};
+  return `
+  <div class="kpis">
+    <div class="kpi out"><div class="kpi-l">Expired</div><div class="kpi-v">${c.exp}</div>
+      <div class="kpi-d">Do not use until re-certified</div></div>
+    <div class="kpi low"><div class="kpi-l">Due within 30 days</div><div class="kpi-v">${c.due}</div>
+      <div class="kpi-d">Book the lab slot now</div></div>
+    <div class="kpi ok"><div class="kpi-l">Valid</div><div class="kpi-v">${c.ok}</div>
+      <div class="kpi-d">of ${c.all} instruments tracked</div></div>
+    <div class="kpi br"><div class="kpi-l">Compliance</div>
+      <div class="kpi-v">${c.all?Math.round(c.ok/c.all*100):100}%</div>
+      <div class="kpi-d">${VIEW.site==='all'?'All sites':siteName(VIEW.site)}</div></div>
+  </div>
+  <div class="tabs">
+    ${[['all','All'],['exp','Expired'],['due','Due soon'],['ok','Valid']]
+      .map(([k,l])=>`<button data-tab="${k}" class="${VIEW.tab===k?'on':''}">${l} ${c[k]?`(${c[k]})`:''}</button>`).join('')}
+  </div>
+  <div class="tools"><div class="srch"><input id="q" placeholder="Search instrument or certificate…" value="${esc(VIEW.q)}"></div></div>
+  <div class="card"><div class="card-b flush" id="listHost">${calList()}</div></div>`;
+}
+function calList(){
+  const q=VIEW.q.toLowerCase();
+  const L=S.tools.filter(t=>inSite(t)&&t.calInt>0)
+    .filter(t=>VIEW.tab==='all'||calState(t)===VIEW.tab)
+    .filter(t=>!q||(t.name+' '+t.code+' '+t.cert).toLowerCase().includes(q))
+    .sort((a,b)=>new Date(a.calNext)-new Date(b.calNext));
+  if(!L.length)return empty('◎','Nothing here','No instruments in this status.');
+  const dd=t=>{const d=daysTo(t.calNext);
+    return d<0?`<b style="color:var(--out)">${Math.abs(d)} days overdue</b>`
+      :d<=30?`<b style="color:var(--low)">in ${d} days</b>`:`<span style="color:var(--ink2)">in ${d} days</span>`;};
+  const act=t=>can('cal')?`<button class="btn sm pri" onclick="calModal('${t.id}')">Record calibration</button>`:'';
+  return `<table class="tbl"><thead><tr><th>Instrument</th><th>Site</th><th>Certificate</th><th>Interval</th>
+    <th>Last</th><th>Next due</th><th>Countdown</th><th>Status</th><th></th></tr></thead><tbody>
+    ${L.map(t=>`<tr><td><div class="pname">${esc(t.name)}</div><div class="psku">${esc(t.code)}</div></td>
+      <td class="mono" style="font-size:12px">${esc(t.site)}</td>
+      <td class="mono" style="font-size:12px">${esc(t.cert||'—')}</td>
+      <td class="mono" style="font-size:12px">${t.calInt} mo</td>
+      <td class="mono" style="font-size:12px">${fmtD(t.calLast)}</td>
+      <td class="mono" style="font-size:12px"><b>${fmtD(t.calNext)}</b></td>
+      <td style="font-size:12.5px">${dd(t)}</td><td>${calPill(calState(t))}</td>
+      <td style="text-align:right">${act(t)}</td></tr>`).join('')}</tbody></table>
+    <div class="rows">${L.map(t=>`<div class="row"><div class="row-m">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1;min-width:0"><div class="pname">${esc(t.name)}</div>
+        <div class="psku">${esc(t.code)} · ${esc(t.site)} · cert ${esc(t.cert||'—')}</div></div>${calPill(calState(t))}</div>
+      <div style="margin-top:7px;font-size:12.5px">Next due <b class="mono">${fmtD(t.calNext)}</b> — ${dd(t)}</div>
+      <div style="font-size:12px;color:var(--ink3);margin-top:2px">Every ${t.calInt} months · last ${fmtD(t.calLast)}</div>
+      ${act(t)?`<div class="row-x">${act(t)}</div>`:''}</div></div>`).join('')}</div>`;
+}
+
+/* ---------- WARRANTY ---------- */
+const warPill=s=>({ok:'<span class="pill ok">Under warranty</span>',
+  soon:'<span class="pill low">Expiring</span>',exp:'<span class="pill out">Expired</span>',
+  none:'<span class="pill mute">Not covered</span>'}[s]);
+function pgWar(){
+  const W=warItems();
+  const c={all:W.length,ok:W.filter(x=>x.st==='ok').length,soon:W.filter(x=>x.st==='soon').length,
+    exp:W.filter(x=>x.st==='exp').length,none:W.filter(x=>x.st==='none').length};
+  const covered=W.filter(x=>x.st==='ok'||x.st==='soon');
+  const coveredVal=covered.reduce((a,x)=>a+x.val,0);
+  const atRisk=W.filter(x=>x.st==='exp').reduce((a,x)=>a+x.val,0);
+  const tracked=c.all-c.none;
+  return `
+  <div class="kpis">
+    <div class="kpi ok"><div class="kpi-l">Under warranty</div><div class="kpi-v">${c.ok}</div>
+      <div class="kpi-d">${money(coveredVal).replace('.00','')} of stock covered</div></div>
+    <div class="kpi low"><div class="kpi-l">Expiring in 60 days</div><div class="kpi-v">${c.soon}</div>
+      <div class="kpi-d">Claim now or lose cover</div></div>
+    <div class="kpi out"><div class="kpi-l">Expired</div><div class="kpi-v">${c.exp}</div>
+      <div class="kpi-d">${money(atRisk).replace('.00','')} no longer covered</div></div>
+    <div class="kpi br"><div class="kpi-l">Coverage</div>
+      <div class="kpi-v">${tracked?Math.round(covered.length/tracked*100):0}%</div>
+      <div class="kpi-d">${tracked} items tracked · ${c.none} not covered</div></div>
+  </div>
+  <div class="tabs">
+    ${[['all','All'],['exp','Expired'],['soon','Expiring'],['ok','Under warranty'],['none','Not covered']]
+      .map(([k,l])=>`<button data-tab="${k}" class="${VIEW.tab===k?'on':''}">${l} ${c[k]?`(${c[k]})`:''}</button>`).join('')}
+  </div>
+  <div class="tools">
+    <div class="srch"><input id="q" placeholder="Search item, SKU or supplier…" value="${esc(VIEW.q)}"></div>
+    <select class="sel" data-filter="cat">
+      <option value="all" ${VIEW.cat==='all'?'selected':''}>Parts and tools</option>
+      <option value="part" ${VIEW.cat==='part'?'selected':''}>Parts only</option>
+      <option value="tool" ${VIEW.cat==='tool'?'selected':''}>Tools only</option></select>
+  </div>
+  <div class="card"><div class="card-b flush" id="listHost">${warList()}</div></div>`;
+}
+function warList(){
+  const q=VIEW.q.toLowerCase();
+  const L=warItems()
+    .filter(x=>VIEW.tab==='all'||x.st===VIEW.tab)
+    .filter(x=>VIEW.cat==='all'||x.kind===VIEW.cat)
+    .filter(x=>!q||(x.name+' '+x.code+' '+(x.o.sup||'')).toLowerCase().includes(q))
+    .sort((a,b)=>{const r={exp:0,soon:1,ok:2,none:3};
+      return r[a.st]-r[b.st]||(a.until&&b.until?new Date(a.until)-new Date(b.until):0);});
+  if(!L.length)return empty('▣','Nothing here','No items in this warranty status.');
+  const cd=x=>{
+    if(!x.until)return '<span style="color:var(--ink3)">—</span>';
+    const d=daysTo(x.until);
+    return d<0?`<b style="color:var(--out)">${Math.abs(d)} days ago</b>`
+      :d<=60?`<b style="color:var(--low)">in ${d} days</b>`
+      :`<span style="color:var(--ink2)">in ${Math.round(d/30)} months</span>`;};
+  const act=x=>can('edit')
+    ?`<button class="btn sm" onclick="${x.kind==='part'?`partModal('${x.o.id}')`:`toolModal('${x.o.id}')`}">Edit</button>`:'';
+  return `<table class="tbl"><thead><tr><th>Item</th><th>Type</th><th>Site</th><th>Supplier</th>
+    <th>Term</th><th>Started</th><th>Expires</th><th>Countdown</th><th>Status</th><th></th></tr></thead><tbody>
+    ${L.map(x=>`<tr><td><div class="pname">${esc(x.name)}</div>
+      <div class="psku">${esc(x.code)} · ${esc(x.sub)}</div></td>
+      <td><span class="pill ${x.kind==='part'?'br':'mute'}">${x.kind}</span></td>
+      <td class="mono" style="font-size:12px">${esc(x.o.site)}</td>
+      <td style="color:var(--ink2)">${esc(x.o.sup||'—')}</td>
+      <td class="mono" style="font-size:12px">${x.o.war?x.o.war+' mo':'—'}</td>
+      <td class="mono" style="font-size:12px">${fmtD(x.o.warFrom)}</td>
+      <td class="mono" style="font-size:12px"><b>${x.until?fmtD(x.until):'—'}</b></td>
+      <td style="font-size:12.5px">${cd(x)}</td><td>${warPill(x.st)}</td>
+      <td style="text-align:right">${act(x)}</td></tr>`).join('')}</tbody></table>
+    <div class="rows">${L.map(x=>`<div class="row"><div class="row-m">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1;min-width:0"><div class="pname">${esc(x.name)}</div>
+        <div class="psku">${esc(x.code)} · ${esc(x.o.site)} · ${esc(x.o.sup||x.sub)}</div></div>${warPill(x.st)}</div>
+      ${x.until?`<div style="margin-top:7px;font-size:12.5px">Expires <b class="mono">${fmtD(x.until)}</b> — ${cd(x)}</div>
+        <div style="font-size:12px;color:var(--ink3);margin-top:2px">${x.o.war} month term from ${fmtD(x.o.warFrom)}</div>`
+        :'<div style="margin-top:7px;font-size:12.5px;color:var(--ink3)">No supplier warranty recorded</div>'}
+      ${act(x)?`<div class="row-x">${act(x)}</div>`:''}</div></div>`).join('')}</div>`;
+}
+
+/* ---------- PURCHASE ORDERS ---------- */
+const poTotal=o=>o.lines.reduce((a,l)=>a+l.qty*l.cost,0);
+const reorderQty=p=>Math.max(p.min*2-p.qty,p.min,1);
+function sugList(){return lowParts().filter(p=>!openPOs().some(o=>o.lines.some(l=>l.part===p.id)));}
+function sugRow(p){
+  const need=reorderQty(p);
+  return `<div class="al"><div class="al-i ${stockState(p)==='out'?'out':'low'}">▤</div>
+    <div style="min-width:0"><div class="al-t">${esc(p.name)}</div>
+    <div class="al-s">${esc(p.sku)} · on hand ${p.qty} of min ${p.min} · lead ${p.lt}d · ${esc(p.sup)}</div></div>
+    <div class="al-r"><div class="mono" style="font-weight:700">+${need} ${esc(p.unit)}</div>
+    <div style="color:var(--ink3)">${money(need*p.cost)}</div></div></div>`;
+}
+function sugModal(){
+  const sug=sugList();
+  const tot=sug.reduce((a,p)=>a+reorderQty(p)*p.cost,0);
+  openModal('Reorder suggestions',`${sug.length} parts below minimum with no order raised`,
+    `<div style="margin:-16px">${sug.map(sugRow).join('')||empty('✓','Nothing to reorder','')}</div>`,
+    `<button class="btn" onclick="closeModal()">Close</button>
+     ${sug.length&&can('po')?`<button class="btn pri" onclick="poModal(null,'auto')">Raise order · ${money(tot).replace('.00','')}</button>`:''}`);
+}
+function pgPo(){
+  const O=S.pos.filter(inSite);
+  const c={all:O.length,draft:O.filter(o=>o.status==='draft').length,ordered:O.filter(o=>o.status==='ordered').length,
+    shipped:O.filter(o=>o.status==='shipped').length,received:O.filter(o=>o.status==='received').length};
+  const sug=sugList();
+  return `
+  <div class="kpis">
+    <div class="kpi ord"><div class="kpi-l">Open orders</div><div class="kpi-v">${c.draft+c.ordered+c.shipped}</div>
+      <div class="kpi-d">${c.draft} awaiting approval</div></div>
+    <div class="kpi br"><div class="kpi-l">Committed spend</div>
+      <div class="kpi-v" style="font-size:22px">${money(O.filter(o=>['ordered','shipped'].includes(o.status)).reduce((a,o)=>a+poTotal(o),0))}</div>
+      <div class="kpi-d">Ordered but not received</div></div>
+    <div class="kpi ${sug.length?'low':'ok'}"><div class="kpi-l">Reorder suggested</div><div class="kpi-v">${sug.length}</div>
+      <div class="kpi-d">Below min with no order</div></div>
+    <div class="kpi ok"><div class="kpi-l">Received (all time)</div><div class="kpi-v">${c.received}</div>
+      <div class="kpi-d">Closed orders</div></div>
+  </div>
+  ${sug.length&&can('po')?`<div class="card">
+    <div class="card-h"><div><div class="card-t">Reorder suggestions</div>
+      <div class="card-s">Below minimum and not on any open order</div></div>
+      <div class="r"><button class="btn pri sm" onclick="poModal(null,'auto')">Raise order for all</button></div></div>
+    <div class="card-b flush">${sug.slice(0,ROWCAP).map(sugRow).join('')}
+      ${moreRow(sug.length,'suggestions','sugModal()')}</div></div>`:''}
+  <div class="tabs">
+    ${[['all','All'],['draft','Draft'],['ordered','Ordered'],['shipped','In transit'],['received','Received']]
+      .map(([k,l])=>`<button data-tab="${k}" class="${VIEW.tab===k?'on':''}">${l} ${c[k]?`(${c[k]})`:''}</button>`).join('')}
+  </div>
+  <div class="tools"><div class="srch"><input id="q" placeholder="Search PO number or supplier…" value="${esc(VIEW.q)}"></div>
+    ${can('po')?'<button class="btn pri" onclick="poModal()">＋ New order</button>':''}</div>
+  <div class="card"><div class="card-b flush" id="listHost">${poList()}</div></div>`;
+}
+function poList(){
+  const q=VIEW.q.toLowerCase();
+  const L=S.pos.filter(inSite).filter(o=>VIEW.tab==='all'||o.status===VIEW.tab)
+    .filter(o=>!q||(o.no+' '+o.sup).toLowerCase().includes(q)).sort((a,b)=>b.created-a.created);
+  if(!L.length)return empty('⇄','No orders here','Raise one from a reorder suggestion or the New order button.');
+  const act=o=>`<button class="btn sm" data-menu onclick="poMenu(event,'${o.id}')">Actions ▾</button>`;
+  const eta=o=>{if(o.status==='received')return '<span style="color:var(--ok)">Received</span>';
+    const d=daysTo(o.eta); return `<span style="color:${d<0?'var(--out)':'var(--ink)'}">${fmtD(o.eta)}${d<0?` (${Math.abs(d)}d late)`:''}</span>`;};
+  return `<table class="tbl"><thead><tr><th>Order</th><th>Supplier</th><th>Site</th><th class="num">Lines</th>
+    <th class="num">Value</th><th>Expected</th><th>Status</th><th></th></tr></thead><tbody>
+    ${L.map(o=>`<tr><td><div class="pname mono">${esc(o.no)}</div><div class="psku">raised ${fmtDT(o.created)}</div></td>
+      <td>${esc(o.sup)}</td><td class="mono" style="font-size:12px">${esc(o.site)}</td>
+      <td class="num">${o.lines.length}</td><td class="num"><b>${money(poTotal(o))}</b></td>
+      <td class="mono" style="font-size:12px">${eta(o)}</td><td>${poPill(o.status)}</td>
+      <td style="text-align:right">${act(o)}</td></tr>`).join('')}</tbody></table>
+    <div class="rows">${L.map(o=>`<div class="row"><div class="row-m">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1;min-width:0"><div class="pname mono">${esc(o.no)}</div>
+        <div class="psku">${esc(o.sup)} · ${esc(o.site)} · ${o.lines.length} line${o.lines.length>1?'s':''}</div></div>${poPill(o.status)}</div>
+      <div style="margin-top:7px;font-size:12.5px">Value <b class="mono">${money(poTotal(o))}</b> ·
+        expected <span class="mono">${eta(o)}</span></div>
+      <div class="row-x">${act(o)}</div></div></div>`).join('')}</div>`;
+}
+function poMenu(e,id){e.stopPropagation();const o=S.pos.find(x=>x.id===id);
+  const nxt={draft:['ordered','Mark as ordered'],ordered:['shipped','Mark as in transit'],shipped:['received','Receive into stock']}[o.status];
+  const needAppr=o.status==='draft'&&!can('poApprove');
+  openMenu(e.currentTarget,`<div class="mh">${esc(o.no)}</div>
+   <button onclick="closeMenu();poDetail('${id}')">◉ View order</button>
+   ${nxt&&can('po')&&!needAppr?`<button onclick="closeMenu();poAdvance('${id}','${nxt[0]}')">→ ${nxt[1]}</button>`:''}
+   ${needAppr?`<div class="mh" style="color:var(--low)">Manager approval required</div>`:''}
+   ${can('po')&&o.status==='draft'?`<button onclick="closeMenu();poModal('${id}')">✎ Edit order</button>`:''}
+   ${can('po')&&['draft','ordered'].includes(o.status)?`<div class="div"></div>
+     <button class="dgr" onclick="closeMenu();poCancel('${id}')">✕ Cancel order</button>`:''}`);}
+
+/* ---------- ACTIVITY LOG ---------- */
+function pgLog(){
+  return `<div class="tools"><div class="srch"><input id="q" placeholder="Search activity…" value="${esc(VIEW.q)}"></div>
+    <select class="sel" data-filter="tab">
+      ${[['all','All activity'],['issue','Issues'],['receive','Receipts'],['adjust','Adjustments'],
+        ['checkout','Tool movements'],['cal','Calibration'],['po','Purchasing']]
+      .map(([k,l])=>`<option value="${k}" ${VIEW.tab===k?'selected':''}>${l}</option>`).join('')}</select>
+    <button class="btn" onclick="window.print()">Print</button></div>
+  <div class="card"><div class="card-b flush" id="listHost">${logList()}</div></div>`;
+}
+function logList(){
+  const q=VIEW.q.toLowerCase();
+  const grp={checkout:['checkout','checkin']};
+  const L=S.log.filter(l=>VIEW.site==='all'||l.site===VIEW.site)
+    .filter(l=>VIEW.tab==='all'||l.type===VIEW.tab||(grp[VIEW.tab]||[]).includes(l.type))
+    .filter(l=>!q||(l.txt+' '+l.by).toLowerCase().includes(q));
+  if(!L.length)return empty('≡','No matching activity','');
+  const ic={issue:'↑',receive:'↓',adjust:'≠',checkout:'⚒',checkin:'↩',po:'⇄',cal:'◎',edit:'✎',add:'＋',del:'✕'};
+  return L.slice(0,200).map(l=>`<div class="al">
+    <div class="al-i ${({issue:'low',receive:'br',adjust:'low',checkout:'ord',checkin:'br',po:'ord',cal:'br',del:'out'})[l.type]||'br'}">${ic[l.type]||'•'}</div>
+    <div style="min-width:0"><div class="al-t" style="font-weight:500">${esc(l.txt)}</div>
+    <div class="al-s">${esc(l.by)} · ${esc(l.site||'—')} · ${fmtDT(l.ts)}</div></div>
+    <div class="al-r" style="color:var(--ink3)">${ago(l.ts)}</div></div>`).join('');
+}
+
+/* ---------- SETTINGS ---------- */
+function pgAdmin(){
+  const admin=can('admin');
+  return `
+  <div class="grid2">
+    <div class="card">
+      <div class="card-h"><div><div class="card-t">Branding</div>
+        <div class="card-s">Shows on the sign-in screen and sidebar</div></div></div>
+      <div class="card-b">
+        <div class="fld"><label>App name</label><input id="cfgName" value="${esc(S.cfg.appName)}"></div>
+        <div class="fld"><label>Logo</label><input id="cfgLogo" type="file" accept="image/*">
+          <div class="hlp">Square image works best. Stored on this device only.</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn pri" onclick="saveBrand()">Save branding</button>
+          ${S.cfg.logo?'<button class="btn" onclick="clearLogo()">Remove logo</button>':''}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div><div class="card-t">Google Sheets sync</div>
+        <div class="card-s">${S.cfg.sheetUrl?'Connected':'Not connected'}</div></div></div>
+      <div class="card-b">
+        <div class="fld"><label>Apps Script web app URL</label>
+          <input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.cfg.sheetUrl)}">
+          <div class="hlp">Deploy the companion Apps Script as a web app, then paste the /exec URL here.</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn pri" onclick="saveUrl()">Save URL</button>
+          <button class="btn" onclick="syncPush()">Push to Sheets</button>
+          <button class="btn" onclick="syncPull()">Pull from Sheets</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><div><div class="card-t">Sites</div>
+      <div class="card-s">${S.sites.length} locations</div></div>
+      ${admin?'<div class="r"><button class="btn sm pri" onclick="siteModal()">＋ Add site</button></div>':''}</div>
+    <div class="card-b flush">
+      ${S.sites.map(s=>{const np=S.parts.filter(p=>p.site===s.id).length,nt=S.tools.filter(t=>t.site===s.id).length;
+      return `<div class="al"><div class="al-i br">${esc(s.code)}</div>
+        <div style="min-width:0"><div class="al-t">${esc(s.name)}</div>
+        <div class="al-s">${np} parts · ${nt} tools</div></div>
+        ${admin?`<div class="al-r"><button class="btn sm" onclick="siteModal('${s.id}')">Edit</button></div>`:''}</div>`;}).join('')}
+    </div>
+  </div>
+
+  ${admin?`<div class="card">
+    <div class="card-h"><div><div class="card-t">Accounts</div>
+      <div class="card-s">Role decides what each person can change</div></div>
+      <div class="r"><button class="btn sm pri" onclick="userModal()">＋ Add user</button></div></div>
+    <div class="card-b flush">
+      ${S.users.map(u=>`<div class="al"><div class="al-i br">${esc(u.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</div>
+        <div style="min-width:0"><div class="al-t">${esc(u.name)}</div>
+        <div class="al-s mono">${esc(u.u)} · ${can('creds')?esc(u.p):'••••••••'} · ${u.site==='all'?'all sites':esc(u.site)}</div></div>
+        <div class="al-r"><span class="pill br">${ROLES[u.role].label}</span>
+        <div style="margin-top:5px"><button class="btn sm" onclick="userModal('${u.u}')">Edit</button></div></div></div>`).join('')}
+    </div>
+    <div class="card-b" style="border-top:1px solid var(--line);font-size:12px;color:var(--ink2)">
+      <b>Manager</b> full control incl. PO approval and accounts ·
+      <b>Storekeeper</b> all stock and tool operations, raises orders ·
+      <b>Technician</b> issues parts and books tools out to themselves ·
+      <b>Guest</b> read only.
+    </div>
+  </div>`:''}
+
+  <div class="card">
+    <div class="card-h"><div><div class="card-t">Photos</div>
+      <div class="card-s">Stored on this device, separate from the main data</div></div></div>
+    <div class="card-b">
+      ${(()=>{const b=photoBytes(), pct=Math.min(100,b/PH_BUDGET*100);
+        const withPh=S.parts.filter(p=>p.photo).length+S.tools.filter(t=>t.photo).length;
+        const linked=S.parts.filter(p=>/^https?:/i.test(p.photo||'')).length
+                    +S.tools.filter(t=>/^https?:/i.test(t.photo||'')).length;
+        return `<div style="display:flex;justify-content:space-between;font-size:12.5px">
+          <b>${Object.keys(PH).length} photo${Object.keys(PH).length===1?'':'s'} on device</b>
+          <span class="mono" style="color:var(--ink2)">${(b/1024/1024).toFixed(2)} MB of ${(PH_BUDGET/1024/1024).toFixed(1)} MB</span></div>
+        <div class="bar-use"><i class="${pct>90?'full':pct>70?'warn':''}" style="width:${pct}%"></i></div>
+        <div style="font-size:11.5px;color:var(--ink3)">${withPh} of ${S.parts.length+S.tools.length} items
+          have a photo · ${linked} use an external link (no device storage)</div>`;})()}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn" onclick="prunePhotos()">Remove unused photos</button>
+        ${can('admin')?'<button class="btn dgr" onclick="clearPhotos()">Delete all device photos</button>':''}
+      </div>
+      <div style="font-size:11.5px;color:var(--ink2);margin-top:10px">
+        Uploads are resized to ${PH_MAX}px and re-encoded, so a phone photo lands around 50 KB.
+        Linked images cost nothing here but need a working connection to display.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><div><div class="card-t">Data</div>
+      <div class="card-s">Everything lives in this browser until you sync</div></div></div>
+    <div class="card-b" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="expJSON()">Export backup (JSON)</button>
+      <button class="btn" onclick="expCSV()">Export parts (CSV)</button>
+      <label class="btn" style="cursor:pointer">Import backup
+        <input type="file" accept="application/json" style="display:none" onchange="impJSON(this)"></label>
+      ${admin?'<button class="btn dgr" onclick="resetAll()">Reset to demo data</button>':''}
+    </div>
+  </div>`;
+}
+
+/* ================= MODALS ================= */
+function alertsModal(){
+  const low=lowParts(),ov=overTools(),cd=calDue(),wx=warExpiring();
+  const sec=(t,arr,fn)=>arr.length?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.6px;color:var(--ink3);margin:14px 0 6px">${t} (${arr.length})</div>`+arr.map(fn).join(''):'';
+  const row=(k,i,t,s,r)=>`<div class="al" style="padding-left:0;padding-right:0"><div class="al-i ${k}">${i}</div>
+    <div style="min-width:0"><div class="al-t">${esc(t)}</div><div class="al-s">${esc(s)}</div></div>
+    <div class="al-r"><span class="pill ${k}">${esc(r)}</span></div></div>`;
+  const n=low.length+ov.length+cd.length+wx.length;
+  const body=n?
+    sec('Stock below minimum',low,p=>row(stockState(p)==='out'?'out':'low','▤',p.name,`${p.sku} · ${siteName(p.site)}`,`${p.qty}/${p.min}`))+
+    sec('Tools past due',ov,t=>row('out','⚒',t.name,`${t.code} · ${t.holder}`,Math.abs(daysTo(t.dueAt))+'d late'))+
+    sec('Calibration',cd,t=>row(calState(t)==='exp'?'out':'low','◎',t.name,`${t.code} · due ${fmtD(t.calNext)}`,calState(t)==='exp'?'expired':daysTo(t.calNext)+'d'))+
+    sec('Warranty expiring',wx,x=>row('low','▣',x.name,`${x.code} · ends ${fmtD(x.until)}`,daysTo(x.until)+'d'))
+    :empty('✓','Nothing needs attention','Stock levels, tool returns, certificates and warranties are all current.');
+  openModal('Alerts',`${n?n+' open item'+(n===1?'':'s'):'All clear'} · ${VIEW.site==='all'?'all warehouses':siteName(VIEW.site)}`,body,
+    `<button class="btn" onclick="closeModal()">Close</button>`);
+}
+function partDetail(id){const p=partById(id);
+  const hist=S.log.filter(l=>l.txt.includes(p.name)).slice(0,6);
+  openModal(p.name,p.sku+' · '+p.cat,
+    `${photoSrc(p)?`<img class="hero" src="${esc(photoSrc(p))}" alt="" onclick="viewPhoto('${p.id}')">`:''}
+     <div style="margin-bottom:14px">${sbar(p)}<div class="sb-lg">
+      <span>on hand <b style="color:var(--ink)">${p.qty} ${esc(p.unit)}</b></span><span>minimum ${p.min}</span></div></div>
+     <div class="kv"><span>Status</span><b>${stPill(stockState(p))}</b></div>
+     <div class="kv"><span>Site</span><b>${esc(siteName(p.site))}</b></div>
+     <div class="kv"><span>Bin location</span><b class="mono">${esc(p.bin)}</b></div>
+     <div class="kv"><span>Unit cost</span><b class="mono">${money(p.cost)}</b></div>
+     <div class="kv"><span>Stock value</span><b class="mono">${money(p.qty*p.cost)}</b></div>
+     <div class="kv"><span>Supplier</span><b>${esc(p.sup)}</b></div>
+     <div class="kv"><span>Lead time</span><b>${p.lt} days</b></div>
+     <div class="kv"><span>Warranty</span><b>${warPill(warState(p))}</b></div>
+     ${p.war?`<div class="kv"><span>Term</span><b>${p.war} months from ${fmtD(p.warFrom)}</b></div>
+       <div class="kv"><span>Covered until</span><b class="mono">${fmtD(warUntil(p))}</b></div>`:''}
+     <div class="kv"><span>Last movement</span><b>${ago(p.updated)}</b></div>
+     ${hist.length?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+       color:var(--ink3);margin:16px 0 4px">Recent history</div>`+hist.map(l=>
+       `<div style="font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--line)">${esc(l.txt)}
+       <div style="color:var(--ink3);font-size:11.5px">${esc(l.by)} · ${ago(l.ts)}</div></div>`).join(''):''}`,
+    `<button class="btn" onclick="closeModal()">Close</button>
+     ${can('issue')?`<button class="btn pri" onclick="issueModal('${id}')">Issue stock</button>`:''}`);
+}
+function toolDetail(id){const t=S.tools.find(x=>x.id===id);
+  openModal(t.name,t.code+' · '+t.cat,
+    `${photoSrc(t)?`<img class="hero" src="${esc(photoSrc(t))}" alt="" onclick="viewPhoto('${t.id}')">`:''}
+     <div class="kv"><span>Status</span><b>${tlPill(toolState(t))}</b></div>
+     <div class="kv"><span>Home site</span><b>${esc(siteName(t.site))}</b></div>
+     <div class="kv"><span>Condition</span><b>${esc(t.cond)}</b></div>
+     ${t.status==='out'?`<div class="kv"><span>Held by</span><b>${esc(t.holder)}</b></div>
+       <div class="kv"><span>Taken out</span><b>${fmtDT(t.outAt)}</b></div>
+       <div class="kv"><span>Due back</span><b class="mono" style="color:${daysTo(t.dueAt)<0?'var(--out)':'inherit'}">${fmtD(t.dueAt)}</b></div>`:''}
+     <div class="kv"><span>Warranty</span><b>${warPill(warState(t))}</b></div>
+     ${t.war?`<div class="kv"><span>Covered until</span><b class="mono">${fmtD(warUntil(t))}</b></div>`:''}
+     <div class="kv"><span>Calibration</span><b>${calPill(calState(t))}</b></div>
+     ${t.calInt?`<div class="kv"><span>Interval</span><b>${t.calInt} months</b></div>
+       <div class="kv"><span>Last certified</span><b class="mono">${fmtD(t.calLast)}</b></div>
+       <div class="kv"><span>Next due</span><b class="mono">${fmtD(t.calNext)}</b></div>
+       <div class="kv"><span>Certificate</span><b class="mono">${esc(t.cert||'—')}</b></div>`:''}
+     ${t.notes?`<div style="margin-top:12px;font-size:12.5px;color:var(--ink2)">${esc(t.notes)}</div>`:''}`,
+    `<button class="btn" onclick="closeModal()">Close</button>
+     ${can('checkout')&&t.status==='in'?`<button class="btn pri" onclick="checkoutModal('${id}')">Check out</button>`:''}
+     ${can('checkout')&&t.status==='out'?`<button class="btn pri" onclick="checkinModal('${id}')">Check in</button>`:''}`);
+}
+function poDetail(id){const o=S.pos.find(x=>x.id===id);
+  openModal(o.no,o.sup+' · '+siteName(o.site),
+    `<div class="kv"><span>Status</span><b>${poPill(o.status)}</b></div>
+     <div class="kv"><span>Raised</span><b>${fmtDT(o.created)} by ${esc(o.by)}</b></div>
+     <div class="kv"><span>Expected</span><b class="mono">${fmtD(o.eta)}</b></div>
+     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3);margin:16px 0 6px">Lines</div>
+     ${o.lines.map(l=>{const p=partById(l.part);return `<div class="kv">
+       <span style="color:var(--ink)">${esc(p?p.name:'Deleted part')}<br>
+       <span class="mono" style="font-size:11px;color:var(--ink3)">${esc(p?p.sku:'')} · ${l.qty} × ${money(l.cost)}</span></span>
+       <b class="mono">${money(l.qty*l.cost)}</b></div>`;}).join('')}
+     <div class="kv" style="border-top:2px solid var(--line);margin-top:6px;padding-top:10px">
+       <span style="font-weight:700;color:var(--ink)">Order total</span><b class="mono" style="font-size:16px">${money(poTotal(o))}</b></div>
+     ${o.notes?`<div style="margin-top:12px;font-size:12.5px;color:var(--ink2)">${esc(o.notes)}</div>`:''}`,
+    `<button class="btn" onclick="closeModal()">Close</button>
+     ${o.status==='shipped'&&can('receive')?`<button class="btn pri" onclick="poAdvance('${id}','received')">Receive into stock</button>`:''}`);
+}
+
+/* ---------- stepper + pickers ---------- */
+function stepper(id,val,max){return `<div class="step">
+  <button type="button" onclick="bump('${id}',-1)">−</button>
+  <input id="${id}" type="number" inputmode="numeric" value="${val}" min="0" ${max!=null?`max="${max}"`:''}>
+  <button type="button" onclick="bump('${id}',1)">＋</button></div>`;}
+function bump(id,d){const i=document.getElementById(id);let v=(parseInt(i.value)||0)+d;
+  if(v<0)v=0; if(i.max&&v>+i.max)v=+i.max; i.value=v; i.dispatchEvent(new Event('input'));}
+function partOpts(sel){return S.parts.filter(p=>VIEW.site==='all'||p.site===VIEW.site)
+  .sort((a,b)=>a.name.localeCompare(b.name))
+  .map(p=>`<option value="${p.id}" ${sel===p.id?'selected':''}>${esc(p.name)} — ${esc(p.sku)} (${p.qty} ${esc(p.unit)} @ ${esc(p.site)})</option>`).join('');}
+
+/* ---------- issue / receive / adjust ---------- */
+function issueModal(id){
+  if(!can('issue'))return toast('Your role cannot issue stock','bad');
+  const first=id||filterParts()[0]?.id||S.parts[0].id;
+  openModal('Issue parts','Take stock out of the store',
+   `<div class="fld"><label>Part</label><select id="ipPart" onchange="issueSync()">${partOpts(first)}</select></div>
+    <div class="fld"><label>Quantity to issue</label>${stepper('ipQty',1)}
+      <div class="hlp" id="ipHint"></div></div>
+    <div class="fld"><label>Issued to</label><input id="ipTo" value="${esc(VIEW.user.name)}" placeholder="Technician name"></div>
+    <div class="fld"><label>Work order / reason</label><input id="ipRef" placeholder="e.g. WO-2280 PCS-2 fan replacement"></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="doIssue()">Issue stock</button>`);
+  $('#ipQty').addEventListener('input',issueSync); issueSync();
+}
+function issueSync(){const p=partById($('#ipPart').value),q=parseInt($('#ipQty').value)||0;
+  const after=p.qty-q;
+  $('#ipHint').innerHTML=`On hand ${p.qty} ${esc(p.unit)} → <b style="color:${after<0?'var(--out)':after<=p.min?'var(--low)':'var(--ok)'}">${after} after issue</b>
+    ${after<0?' — not enough stock':after<=p.min&&after>=0?' — will drop below minimum':''}`;
+  $('#ipQty').max=p.qty;
+}
+function doIssue(){
+  const p=partById($('#ipPart').value), q=parseInt($('#ipQty').value)||0;
+  const to=$('#ipTo').value.trim()||VIEW.user.name, ref=$('#ipRef').value.trim();
+  if(q<1)return toast('Enter a quantity of 1 or more','bad');
+  if(q>p.qty)return toast(`Only ${p.qty} ${p.unit} on hand`,'bad');
+  p.qty-=q; p.updated=Date.now();
+  logIt('issue',`Issued ${q} × ${p.name} to ${to}${ref?' ('+ref+')':''}`,p.site,
+    {part:p.id,qty:q,value:+(q*p.cost).toFixed(2)});
+  save(); closeModal(); buildNav(); render();
+  toast(`Issued ${q} ${p.unit} — ${p.qty} left`,'good');
+}
+function receiveModal(id){
+  if(!can('receive'))return toast('Your role cannot receive stock','bad');
+  const first=id||S.parts[0].id;
+  openModal('Receive stock','Book delivered goods into the store',
+   `<div class="fld"><label>Part</label><select id="rcPart" onchange="rcSync()">${partOpts(first)}</select></div>
+    <div class="fld"><label>Quantity received</label>${stepper('rcQty',1)}<div class="hlp" id="rcHint"></div></div>
+    <div class="fld"><label>Delivery note / PO reference</label><input id="rcRef" placeholder="e.g. PO-2608-013"></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="doReceive()">Receive stock</button>`);
+  $('#rcQty').addEventListener('input',rcSync); rcSync();
+}
+function rcSync(){const p=partById($('#rcPart').value),q=parseInt($('#rcQty').value)||0;
+  $('#rcHint').innerHTML=`On hand ${p.qty} → <b style="color:var(--ok)">${p.qty+q} ${esc(p.unit)}</b> · bin ${esc(p.bin)}`;}
+function doReceive(){
+  const p=partById($('#rcPart').value), q=parseInt($('#rcQty').value)||0, ref=$('#rcRef').value.trim();
+  if(q<1)return toast('Enter a quantity of 1 or more','bad');
+  p.qty+=q; p.updated=Date.now();
+  if(p.war)p.warFrom=iso(today());          // new batch restarts the supplier warranty
+  logIt('receive',`Received ${q} × ${p.name} into ${p.bin}${ref?' ('+ref+')':''}`,p.site,
+    {part:p.id,qty:q,value:+(q*p.cost).toFixed(2)});
+  save(); closeModal(); buildNav(); render(); toast(`Received ${q} ${p.unit} — now ${p.qty}`,'good');
+}
+function adjustModal(id){
+  if(!can('adjust'))return toast('Your role cannot adjust stock','bad');
+  const p=partById(id);
+  openModal('Stock count',`${p.name} · ${p.sku}`,
+   `<div class="fld"><label>Counted quantity</label>${stepper('adQty',p.qty)}
+     <div class="hlp" id="adHint">System says ${p.qty} ${esc(p.unit)}</div></div>
+    <div class="fld"><label>Reason for the difference</label>
+      <select id="adWhy"><option>Physical count correction</option><option>Damaged / scrapped</option>
+      <option>Found in another bin</option><option>Returned unused</option><option>Data entry error</option></select></div>
+    <div class="fld"><label>Note</label><textarea id="adNote" placeholder="Optional detail for the audit trail"></textarea></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="doAdjust('${id}')">Save count</button>`);
+  $('#adQty').addEventListener('input',()=>{const q=parseInt($('#adQty').value)||0,d=q-p.qty;
+    $('#adHint').innerHTML=`System says ${p.qty} ${esc(p.unit)} · difference
+      <b style="color:${d===0?'var(--ink2)':d>0?'var(--ok)':'var(--out)'}">${d>0?'+':''}${d}</b>`;});
+}
+function doAdjust(id){const p=partById(id),q=parseInt($('#adQty').value)||0,why=$('#adWhy').value,n=$('#adNote').value.trim();
+  const d=q-p.qty; if(d===0){closeModal();return toast('No change recorded');}
+  p.qty=q; p.updated=Date.now();
+  logIt('adjust',`Stock count: ${p.name} ${d>0?'+':''}${d} → ${q} ${p.unit} (${why})${n?' — '+n:''}`,p.site);
+  save(); closeModal(); buildNav(); render(); toast(`Adjusted by ${d>0?'+':''}${d}`,'good');
+}
+
+/* ---------- photo picker (shared by the part and tool editors) ---------- */
+let EDITPH;   // undefined = untouched, '' = remove, otherwise dataURL or http link
+function photoField(o){
+  EDITPH=undefined;
+  const src=photoSrc(o);
+  return `<div class="fld"><label>Photo</label><div class="phfld">
+    <div id="phPrev">${src?`<img class="pv" src="${esc(src)}" alt="">`:'<div class="pv ph0">▤</div>'}</div>
+    <div style="flex:1;min-width:0">
+      <div class="ac">
+        <label class="lbl-btn">Upload photo
+          <input type="file" accept="image/*" style="display:none" onchange="pickPhoto(this)"></label>
+        <button type="button" class="btn sm" onclick="linkPhoto()">Use a link</button>
+        <button type="button" class="btn sm" onclick="clearPhoto()">Remove</button>
+      </div>
+      <div class="hlp" id="phHint">${src
+        ?(/^https?:/i.test(o.photo||'')?'Currently linked to an external image.':'Stored on this device.')
+        :'On a phone this opens the camera or your gallery.'}</div>
+    </div></div></div>`;
+}
+function phPreview(src,hint){
+  $('#phPrev').innerHTML=src?`<img class="pv" src="${esc(src)}" alt="">`:'<div class="pv ph0">▤</div>';
+  $('#phHint').textContent=hint;
+}
+async function pickPhoto(inp){
+  const f=inp.files&&inp.files[0]; inp.value='';
+  if(!f)return;
+  $('#phHint').textContent='Processing…';
+  try{
+    const data=await shrinkImage(f);
+    const kb=Math.round(data.length*0.75/1024);
+    if(photoBytes()+data.length>PH_BUDGET)
+      return phPreview(photoSrc({photo:EDITPH}),'Photo storage is full. Remove some photos first, or use a link instead.');
+    EDITPH=data;
+    phPreview(data,`Ready to save · ${kb} KB (resized from ${Math.round(f.size/1024)} KB)`);
+  }catch(e){ phPreview(null,e.message); }
+}
+function linkPhoto(){
+  const cur=EDITPH!==undefined&&/^https?:/i.test(EDITPH||'')?EDITPH:'';
+  const v=prompt('Paste the image address (must start with https://)',cur);
+  if(v===null)return;
+  const u=v.trim();
+  if(!u){EDITPH='';return phPreview(null,'Photo will be removed on save.');}
+  if(!/^https?:\/\//i.test(u))return toast('Links must start with http:// or https://','bad');
+  EDITPH=u; phPreview(u,'Linked image. Nothing is stored on this device.');
+}
+function clearPhoto(){EDITPH='';phPreview(null,'Photo will be removed on save.');}
+/** Apply the pending picker choice to an item. Returns true if photos changed. */
+function commitPhoto(o){
+  if(EDITPH===undefined)return false;
+  if(o.photo&&!/^https?:/i.test(o.photo))delete PH[o.photo];
+  if(EDITPH===''){o.photo='';}
+  else if(/^https?:/i.test(EDITPH)){o.photo=EDITPH;}
+  else{const id=uid('ph'); PH[id]=EDITPH; o.photo=id;}
+  EDITPH=undefined;
+  return true;
+}
+
+/* ---------- part / tool editors ---------- */
+function partModal(id){
+  if(!can('edit'))return toast('Your role cannot edit parts','bad');
+  const p=id?partById(id):{sku:'',name:'',cat:'Battery',site:VIEW.site==='all'?S.sites[0].id:VIEW.site,
+    qty:0,min:1,unit:'pcs',bin:'',cost:0,sup:'',lt:14,war:12,warFrom:iso(today()),photo:''};
+  const cats=[...new Set([...S.parts.map(x=>x.cat),'Battery','PCS','HVAC','Electrical','Fire','Comms','Consumable','Mechanical'])].sort();
+  openModal(id?'Edit part':'Add part',id?p.sku:'New stock line',
+   `${photoField(p)}
+    <div class="fld"><label>Part name</label><input id="pfName" value="${esc(p.name)}"></div>
+    <div class="f2"><div class="fld"><label>SKU / part number</label><input id="pfSku" class="mono" value="${esc(p.sku)}"></div>
+    <div class="fld"><label>Bin location</label><input id="pfBin" class="mono" value="${esc(p.bin)}" placeholder="A1-03"></div></div>
+    <div class="f2"><div class="fld"><label>Category</label><select id="pfCat">
+      ${cats.map(c=>`<option ${p.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="fld"><label>Site</label><select id="pfSite">
+      ${S.sites.map(s=>`<option value="${s.id}" ${p.site===s.id?'selected':''}>${esc(s.code)} — ${esc(s.name)}</option>`).join('')}</select></div></div>
+    <div class="f2"><div class="fld"><label>On hand</label><input id="pfQty" type="number" value="${p.qty}" ${id?'disabled':''}>
+      ${id?'<div class="hlp">Use Issue, Receive or Stock count to change quantity.</div>':''}</div>
+    <div class="fld"><label>Minimum level</label><input id="pfMin" type="number" value="${p.min}"></div></div>
+    <div class="f2"><div class="fld"><label>Unit</label><input id="pfUnit" value="${esc(p.unit)}" placeholder="pcs"></div>
+    <div class="fld"><label>Unit cost (USD)</label><input id="pfCost" type="number" step="0.01" value="${p.cost}"></div></div>
+    <div class="f2"><div class="fld"><label>Supplier</label><input id="pfSup" value="${esc(p.sup)}"></div>
+    <div class="fld"><label>Lead time (days)</label><input id="pfLt" type="number" value="${p.lt}"></div></div>
+    <div class="f2"><div class="fld"><label>Warranty (months)</label>
+      <input id="pfWar" type="number" value="${p.war||0}"><div class="hlp">0 = no supplier warranty</div></div>
+    <div class="fld"><label>Warranty starts</label><input id="pfWarFrom" type="date" value="${p.warFrom||''}">
+      <div class="hlp">Reset automatically on each goods-in.</div></div></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="savePart('${id||''}')">${id?'Save changes':'Add part'}</button>`);
+}
+function savePart(id){
+  const g=k=>$('#pf'+k).value.trim(), n=k=>Number($('#pf'+k).value)||0;
+  if(!g('Name'))return toast('Part name is required','bad');
+  if(!g('Sku'))return toast('SKU is required','bad');
+  let phDirty=false;
+  if(id){const p=partById(id);
+    Object.assign(p,{name:g('Name'),sku:g('Sku'),bin:g('Bin'),cat:g('Cat'),site:g('Site'),
+      min:n('Min'),unit:g('Unit')||'pcs',cost:n('Cost'),sup:g('Sup'),lt:n('Lt'),
+      war:n('War'),warFrom:$('#pfWarFrom').value||null,updated:Date.now()});
+    phDirty=commitPhoto(p);
+    logIt('edit',`Updated part ${p.name} (${p.sku})`,p.site);
+  }else{
+    const p={id:uid('p'),name:g('Name'),sku:g('Sku'),bin:g('Bin'),cat:g('Cat'),site:g('Site'),
+      qty:n('Qty'),min:n('Min'),unit:g('Unit')||'pcs',cost:n('Cost'),sup:g('Sup'),lt:n('Lt'),
+      war:n('War'),warFrom:$('#pfWarFrom').value||null,updated:Date.now()};
+    phDirty=commitPhoto(p);
+    S.parts.push(p); logIt('add',`Added part ${p.name} (${p.sku}) with ${p.qty} ${p.unit}`,p.site);
+  }
+  save(); if(phDirty)savePhotos();
+  closeModal(); buildNav(); render(); toast(id?'Part updated':'Part added','good');
+}
+function delPart(id){const p=partById(id);
+  openModal('Delete part',p.sku,`<p style="font-size:13.5px;margin:0">Deleting <b>${esc(p.name)}</b> removes it from the
+    store and from any draft orders. The activity log keeps the history.</p>`,
+   `<button class="btn" onclick="closeModal()">Keep it</button>
+    <button class="btn dgr" onclick="doDelPart('${id}')">Delete part</button>`);}
+function doDelPart(id){const p=partById(id);
+  if(p.photo&&!/^https?:/i.test(p.photo))delete PH[p.photo];
+  S.parts=S.parts.filter(x=>x.id!==id);
+  S.pos.forEach(o=>o.lines=o.lines.filter(l=>l.part!==id));
+  savePhotos();
+  logIt('del',`Deleted part ${p.name} (${p.sku})`,p.site);
+  save(); closeModal(); buildNav(); render(); toast('Part deleted','good');}
+
+function toolModal(id){
+  if(!can('edit'))return toast('Your role cannot edit tools','bad');
+  const t=id?S.tools.find(x=>x.id===id):{code:'TL-'+String(S.tools.length+1).padStart(3,'0'),name:'',
+    cat:'Test & Measure',site:VIEW.site==='all'?S.sites[0].id:VIEW.site,status:'in',holder:'',
+    calInt:12,calLast:iso(today()),cert:'',cond:'Good',notes:'',war:24,warFrom:iso(today()),photo:''};
+  const cats=['Test & Measure','Mechanical','Safety','Comms','Lifting','Other'];
+  openModal(id?'Edit tool':'Add tool',id?t.code:'New tool record',
+   `${photoField(t)}
+    <div class="fld"><label>Tool name</label><input id="tfName" value="${esc(t.name)}"></div>
+    <div class="f2"><div class="fld"><label>Asset code</label><input id="tfCode" class="mono" value="${esc(t.code)}"></div>
+    <div class="fld"><label>Category</label><select id="tfCat">
+      ${cats.map(c=>`<option ${t.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div></div>
+    <div class="f2"><div class="fld"><label>Home site</label><select id="tfSite">
+      ${S.sites.map(s=>`<option value="${s.id}" ${t.site===s.id?'selected':''}>${esc(s.code)} — ${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="fld"><label>Condition</label><select id="tfCond">
+      ${['Good','Fair','Needs repair'].map(c=>`<option ${t.cond===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
+    <div class="f2"><div class="fld"><label>Calibration interval (months)</label>
+      <input id="tfInt" type="number" value="${t.calInt}"><div class="hlp">0 = calibration not required</div></div>
+    <div class="fld"><label>Last calibrated</label><input id="tfLast" type="date" value="${t.calLast||''}"></div></div>
+    <div class="fld"><label>Certificate number</label><input id="tfCert" class="mono" value="${esc(t.cert)}"></div>
+    <div class="f2"><div class="fld"><label>Warranty (months)</label><input id="tfWar" type="number" value="${t.war||0}"></div>
+    <div class="fld"><label>Warranty starts</label><input id="tfWarFrom" type="date" value="${t.warFrom||''}"></div></div>
+    <div class="fld"><label>Notes</label><textarea id="tfNotes">${esc(t.notes)}</textarea></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="saveTool('${id||''}')">${id?'Save changes':'Add tool'}</button>`);
+}
+function saveTool(id){
+  const g=k=>$('#tf'+k).value.trim();
+  if(!g('Name'))return toast('Tool name is required','bad');
+  const int=Number($('#tfInt').value)||0, last=$('#tfLast').value||null;
+  const base={name:g('Name'),code:g('Code'),cat:g('Cat'),site:g('Site'),cond:g('Cond'),
+    calInt:int,calLast:int?last:null,calNext:int&&last?addD(int*30,last):null,cert:g('Cert'),notes:g('Notes'),
+    war:Number($('#tfWar').value)||0,warFrom:$('#tfWarFrom').value||null};
+  let phDirty=false, obj;
+  if(id){obj=S.tools.find(x=>x.id===id); Object.assign(obj,base);
+    phDirty=commitPhoto(obj); logIt('edit',`Updated tool ${base.name} (${base.code})`,base.site);}
+  else{obj=Object.assign({id:uid('t'),status:'in',holder:'',outAt:null,dueAt:null,photo:''},base);
+    phDirty=commitPhoto(obj); S.tools.push(obj);
+    logIt('add',`Added tool ${base.name} (${base.code})`,base.site);}
+  save(); if(phDirty)savePhotos();
+  closeModal(); buildNav(); render(); toast(id?'Tool updated':'Tool added','good');
+}
+function delTool(id){const t=S.tools.find(x=>x.id===id);
+  openModal('Delete tool',t.code,`<p style="font-size:13.5px;margin:0">Remove <b>${esc(t.name)}</b> from the
+    register? Its calibration record goes with it.</p>`,
+   `<button class="btn" onclick="closeModal()">Keep it</button>
+    <button class="btn dgr" onclick="doDelTool('${id}')">Delete tool</button>`);}
+function doDelTool(id){const t=S.tools.find(x=>x.id===id);
+  if(t.photo&&!/^https?:/i.test(t.photo))delete PH[t.photo];
+  S.tools=S.tools.filter(x=>x.id!==id); savePhotos();
+  logIt('del',`Deleted tool ${t.name} (${t.code})`,t.site);
+  save(); closeModal(); buildNav(); render(); toast('Tool deleted','good');}
+
+/* ---------- tool movements ---------- */
+function checkoutModal(id){
+  if(!can('checkout'))return toast('Your role cannot book tools out','bad');
+  const avail=S.tools.filter(t=>inSite(t)&&t.status==='in');
+  if(!avail.length)return toast('No tools available at this site','bad');
+  const pick=id||avail[0].id;
+  const self=VIEW.user.role==='tech';
+  openModal('Check out tool','Book a tool out to a person',
+   `<div class="fld"><label>Tool</label><select id="coTool" onchange="coSync()">
+      ${avail.map(t=>`<option value="${t.id}" ${pick===t.id?'selected':''}>${esc(t.code)} — ${esc(t.name)} (${esc(t.site)})</option>`).join('')}
+      </select><div class="hlp" id="coHint"></div></div>
+    <div class="fld"><label>Issued to</label><input id="coWho" value="${esc(VIEW.user.name)}" ${self?'readonly':''}>
+      ${self?'<div class="hlp">Technicians book tools out under their own name.</div>':''}</div>
+    <div class="fld"><label>Return by</label>
+      <div class="pick" style="margin-bottom:8px">
+        ${[['End of today',0],['3 days',3],['1 week',7],['2 weeks',14]].map(([l,d],i)=>
+          `<button type="button" class="${i===2?'on':''}" onclick="coDue(this,${d})">${l}</button>`).join('')}</div>
+      <input id="coDue" type="date" value="${addD(7)}"></div>
+    <div class="fld"><label>Purpose</label><input id="coWhy" placeholder="e.g. Bavet quarterly IR scan"></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="doCheckout()">Check out</button>`);
+  coSync();
+}
+function coDue(btn,d){$$('#modal .pick button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+  $('#coDue').value=addD(d);}
+function coSync(){const t=S.tools.find(x=>x.id===$('#coTool').value); const st=calState(t);
+  $('#coHint').innerHTML = st==='exp'
+    ? `<b style="color:var(--out)">Calibration expired ${fmtD(t.calNext)} — this tool should not be used for verification work.</b>`
+    : st==='due' ? `<b style="color:var(--low)">Calibration due ${fmtD(t.calNext)}.</b>`
+    : t.calInt ? `Calibration valid to ${fmtD(t.calNext)}.` : 'No calibration required.';}
+function doCheckout(){
+  const t=S.tools.find(x=>x.id===$('#coTool').value);
+  const who=$('#coWho').value.trim(), due=$('#coDue').value, why=$('#coWhy').value.trim();
+  if(!who)return toast('Enter who is taking the tool','bad');
+  if(!due)return toast('Set a return date','bad');
+  t.status='out'; t.holder=who; t.outAt=Date.now(); t.dueAt=due;
+  logIt('checkout',`Checked out ${t.name} (${t.code}) to ${who}, due ${fmtD(due)}${why?' — '+why:''}`,t.site);
+  save(); closeModal(); buildNav(); render(); toast(`${t.code} booked out to ${who}`,'good');
+}
+function checkinModal(id){
+  if(!can('checkout'))return toast('Your role cannot check tools in','bad');
+  const out=S.tools.filter(t=>inSite(t)&&t.status==='out');
+  if(!out.length)return toast('No tools are currently out','bad');
+  const pick=id||out[0].id;
+  openModal('Check in tool','Return a tool to the store',
+   `<div class="fld"><label>Tool</label><select id="ciTool">
+     ${out.map(t=>`<option value="${t.id}" ${pick===t.id?'selected':''}>${esc(t.code)} — ${esc(t.name)} · ${esc(t.holder)}${daysTo(t.dueAt)<0?' (overdue)':''}</option>`).join('')}
+     </select></div>
+    <div class="fld"><label>Condition on return</label>
+      <div class="pick">${['Good','Fair','Needs repair'].map((c,i)=>
+        `<button type="button" class="${i===0?'on':''}" data-cond="${c}" onclick="pickOne(this)">${c}</button>`).join('')}</div></div>
+    <div class="fld"><label>Note</label><textarea id="ciNote" placeholder="Damage, missing accessories, anything the next user should know"></textarea></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="doCheckin()">Check in</button>`);
+}
+function pickOne(b){b.parentNode.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');}
+function doCheckin(){
+  const t=S.tools.find(x=>x.id===$('#ciTool').value);
+  const cond=$('#modal .pick button.on')?.dataset.cond||'Good', note=$('#ciNote').value.trim();
+  const late=t.dueAt&&daysTo(t.dueAt)<0?` (${Math.abs(daysTo(t.dueAt))} days late)`:'';
+  const who=t.holder;
+  t.status=cond==='Needs repair'?'maint':'in'; t.cond=cond; t.holder=''; t.outAt=null; t.dueAt=null;
+  if(note)t.notes=note;
+  logIt('checkin',`Checked in ${t.name} (${t.code}) from ${who}${late} — condition ${cond}${note?': '+note:''}`,t.site);
+  save(); closeModal(); buildNav(); render();
+  toast(cond==='Needs repair'?`${t.code} received and flagged for service`:`${t.code} back in store`,'good');
+}
+function svcToggle(id){const t=S.tools.find(x=>x.id===id);
+  if(t.status==='out')return toast('Check the tool in first','bad');
+  t.status=t.status==='maint'?'in':'maint';
+  logIt('edit',`${t.name} (${t.code}) ${t.status==='maint'?'sent for service':'returned to service'}`,t.site);
+  save(); buildNav(); render(); toast(t.status==='maint'?'Flagged for service':'Back in service','good');}
+
+/* ---------- calibration ---------- */
+function calModal(id){
+  if(!can('cal'))return toast('Your role cannot record calibration','bad');
+  const t=S.tools.find(x=>x.id===id);
+  openModal('Record calibration',`${t.name} · ${t.code}`,
+   `<div class="fld"><label>Date calibrated</label><input id="clDate" type="date" value="${iso(today())}"
+      onchange="clSync('${id}')"></div>
+    <div class="fld"><label>Certificate number</label><input id="clCert" class="mono" value="${esc(t.cert)}"
+      placeholder="CAL-0000"></div>
+    <div class="f2"><div class="fld"><label>Interval (months)</label>
+      <input id="clInt" type="number" value="${t.calInt}" onchange="clSync('${id}')"></div>
+    <div class="fld"><label>Next due</label><input id="clNext" type="date" readonly></div></div>
+    <div class="fld"><label>Result</label>
+      <div class="pick">${['Pass','Pass with adjustment','Fail'].map((c,i)=>
+        `<button type="button" class="${i===0?'on':''}" data-res="${c}" onclick="pickOne(this)">${c}</button>`).join('')}</div></div>
+    <div class="fld"><label>Lab / provider</label><input id="clLab" placeholder="e.g. NMC Cambodia"></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="doCal('${id}')">Save certificate</button>`);
+  clSync(id);
+}
+function clSync(){const d=$('#clDate').value, i=Number($('#clInt').value)||0;
+  $('#clNext').value = (d&&i)?addD(i*30,d):'';}
+function doCal(id){const t=S.tools.find(x=>x.id===id);
+  const d=$('#clDate').value, i=Number($('#clInt').value)||0, cert=$('#clCert').value.trim();
+  const res=$('#modal .pick button.on')?.dataset.res||'Pass', lab=$('#clLab').value.trim();
+  if(!d)return toast('Set the calibration date','bad');
+  t.calLast=d; t.calInt=i; t.calNext=i?addD(i*30,d):null; t.cert=cert;
+  if(res==='Fail'){t.status='maint';}
+  logIt('cal',`Calibration ${res.toLowerCase()} for ${t.name} (${t.code})${cert?' cert '+cert:''}${lab?' at '+lab:''}${t.calNext?', next due '+fmtD(t.calNext):''}`,t.site);
+  save(); closeModal(); buildNav(); render();
+  toast(res==='Fail'?'Recorded as failed — tool flagged for service':'Calibration recorded','good');
+}
+
+/* ---------- purchase orders ---------- */
+let poDraft=[];
+function poModal(id,seedPart){
+  if(!can('po'))return toast('Your role cannot raise orders','bad');
+  const o=id?S.pos.find(x=>x.id===id):null;
+  if(o)poDraft=o.lines.map(l=>({...l}));
+  else if(seedPart==='auto'){
+    poDraft=sugList().map(p=>({part:p.id,qty:reorderQty(p),cost:p.cost}));
+  } else if(seedPart){const p=partById(seedPart);poDraft=[{part:p.id,qty:reorderQty(p),cost:p.cost}];}
+  else poDraft=[];
+  const sup=o?o.sup:(poDraft[0]?partById(poDraft[0].part).sup:'');
+  const site=o?o.site:(VIEW.site==='all'?S.sites[0].id:VIEW.site);
+  const lead=poDraft.length?Math.max(...poDraft.map(l=>partById(l.part)?.lt||14)):14;
+  openModal(o?'Edit order':'New purchase order',o?o.no:'Raise a supply request',
+   `<div class="f2"><div class="fld"><label>Supplier</label><input id="poSup" value="${esc(sup)}" placeholder="Supplier name"></div>
+    <div class="fld"><label>Deliver to</label><select id="poSite">
+      ${S.sites.map(s=>`<option value="${s.id}" ${site===s.id?'selected':''}>${esc(s.code)} — ${esc(s.name)}</option>`).join('')}</select></div></div>
+    <div class="fld"><label>Expected delivery</label><input id="poEta" type="date" value="${o?o.eta:addD(lead)}">
+      <div class="hlp">Pre-filled from the longest supplier lead time on this order.</div></div>
+    <div class="fld"><label>Lines</label><div id="poLines"></div>
+      <select class="sel" id="poAdd" style="width:100%;margin-top:8px" onchange="poAddLine()">
+        <option value="">＋ Add a part to this order…</option>${partOpts()}</select></div>
+    <div class="fld"><label>Notes</label><textarea id="poNotes">${o?esc(o.notes):''}</textarea></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="savePO('${id||''}')">${o?'Save order':'Create order'}</button>`);
+  poLines();
+}
+function poLines(){
+  const h=$('#poLines'); if(!h)return;
+  if(!poDraft.length){h.innerHTML=`<div style="padding:14px;text-align:center;color:var(--ink3);font-size:12.5px;
+    border:1px dashed var(--line2);border-radius:9px">No lines yet — add a part below.</div>`;return;}
+  h.innerHTML=poDraft.map((l,i)=>{const p=partById(l.part);if(!p)return '';
+    return `<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)">
+      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${esc(p.name)}</div>
+        <div class="psku">${esc(p.sku)} · on hand ${p.qty}/${p.min} · ${money(l.cost)} each</div></div>
+      <input type="number" value="${l.qty}" min="1" style="width:64px;padding:7px;border:1px solid var(--line);
+        border-radius:7px;text-align:center;font-family:var(--mono)" oninput="poQty(${i},this.value)">
+      <button class="btn sm" onclick="poDel(${i})">✕</button></div>`;}).join('')+
+    `<div style="display:flex;justify-content:space-between;padding-top:10px;font-size:14px">
+      <b>Order total</b><b class="mono">${money(poDraft.reduce((a,l)=>a+l.qty*l.cost,0))}</b></div>`;
+}
+function poAddLine(){const id=$('#poAdd').value; if(!id)return; $('#poAdd').value='';
+  if(poDraft.some(l=>l.part===id))return toast('Already on this order','bad');
+  const p=partById(id); poDraft.push({part:id,qty:reorderQty(p),cost:p.cost});
+  if(!$('#poSup').value)$('#poSup').value=p.sup; poLines();}
+function poQty(i,v){poDraft[i].qty=Math.max(1,parseInt(v)||1);poLines();}
+function poDel(i){poDraft.splice(i,1);poLines();}
+function savePO(id){
+  const sup=$('#poSup').value.trim(), site=$('#poSite').value, eta=$('#poEta').value, notes=$('#poNotes').value.trim();
+  if(!sup)return toast('Supplier is required','bad');
+  if(!poDraft.length)return toast('Add at least one line','bad');
+  if(id){const o=S.pos.find(x=>x.id===id);Object.assign(o,{sup,site,eta,notes,lines:poDraft.map(l=>({...l}))});
+    logIt('po',`Updated ${o.no} — ${o.lines.length} line${o.lines.length>1?'s':''}, ${money(poTotal(o))}`,site);}
+  else{S.cfg.poSeq=(S.cfg.poSeq||0)+1;
+    const d=new Date(), no='PO-'+String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+'-'+String(S.cfg.poSeq).padStart(3,'0');
+    const o={id:uid('po'),no,sup,site,status:'draft',created:Date.now(),eta,by:VIEW.user.u,notes,lines:poDraft.map(l=>({...l}))};
+    S.pos.unshift(o);
+    logIt('po',`Created ${no} — ${sup}, ${o.lines.length} line${o.lines.length>1?'s':''}, ${money(poTotal(o))}`,site);}
+  poDraft=[]; save(); closeModal(); buildNav(); render(); toast(id?'Order saved':'Order created as draft','good');
+}
+function poAdvance(id,to){
+  const o=S.pos.find(x=>x.id===id);
+  if(to==='ordered'&&!can('poApprove'))return toast('A manager must approve draft orders','bad');
+  if(to==='received'){
+    let n=0; o.lines.forEach(l=>{const p=partById(l.part);if(!p)return;
+      p.qty+=l.qty; p.updated=Date.now(); n+=l.qty;
+      if(p.war)p.warFrom=iso(today());
+      logIt('receive',`Received ${l.qty} × ${p.name} on ${o.no}`,p.site,
+        {part:p.id,qty:l.qty,value:+(l.qty*l.cost).toFixed(2)});});
+    o.status='received'; logIt('po',`${o.no} received — ${n} items booked into ${o.site} store`,o.site);
+    save(); closeModal(); buildNav(); render(); return toast(`${o.no} received — ${n} items added to stock`,'good');
+  }
+  o.status=to;
+  logIt('po',`${o.no} marked as ${to==='shipped'?'in transit':to}`,o.site);
+  save(); closeModal(); buildNav(); render(); toast(`${o.no} → ${to==='shipped'?'in transit':to}`,'good');
+}
+function poCancel(id){const o=S.pos.find(x=>x.id===id);
+  openModal('Cancel order',o.no,`<p style="font-size:13.5px;margin:0">Cancel <b>${esc(o.no)}</b> to
+    ${esc(o.sup)}? Stock will not be booked in and the order closes.</p>`,
+   `<button class="btn" onclick="closeModal()">Keep order</button>
+    <button class="btn dgr" onclick="doPoCancel('${id}')">Cancel order</button>`);}
+function doPoCancel(id){const o=S.pos.find(x=>x.id===id);o.status='cancelled';
+  logIt('po',`Cancelled ${o.no} (${o.sup})`,o.site);
+  save(); closeModal(); buildNav(); render(); toast('Order cancelled','good');}
+
+/* ---------- admin ---------- */
+function siteModal(id){
+  if(!can('admin'))return toast('Manager access required','bad');
+  const s=id?S.sites.find(x=>x.id===id):{id:'',name:'',code:''};
+  openModal(id?'Edit site':'Add site',id?s.id:'New location',
+   `<div class="fld"><label>Site name</label><input id="sfName" value="${esc(s.name)}" placeholder="Bavet BESS 20MW"></div>
+    <div class="fld"><label>Short code</label><input id="sfCode" class="mono" value="${esc(s.code)}" maxlength="6"
+      placeholder="BVT" ${id?'disabled':''}><div class="hlp">Used on labels and bin references. Cannot change later.</div></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    ${id&&S.sites.length>1?`<button class="btn dgr" onclick="doDelSite('${id}')">Delete</button>`:''}
+    <button class="btn pri" onclick="saveSite('${id||''}')">Save site</button>`);
+}
+function saveSite(id){
+  const name=$('#sfName').value.trim(), code=$('#sfCode').value.trim().toUpperCase();
+  if(!name)return toast('Site name is required','bad');
+  if(id){S.sites.find(x=>x.id===id).name=name;}
+  else{if(!code)return toast('Short code is required','bad');
+    if(S.sites.some(x=>x.id===code))return toast('That code is already used','bad');
+    S.sites.push({id:code,name,code});}
+  save(); closeModal(); buildSites(); render(); toast('Site saved','good');
+}
+function doDelSite(id){
+  if(S.parts.some(p=>p.site===id)||S.tools.some(t=>t.site===id))
+    return toast('Move its parts and tools out first','bad');
+  S.sites=S.sites.filter(x=>x.id!==id); if(VIEW.site===id)VIEW.site='all';
+  save(); closeModal(); buildSites(); render(); toast('Site deleted','good');
+}
+function userModal(u){
+  if(!can('admin'))return toast('Manager access required','bad');
+  const a=u?S.users.find(x=>x.u===u):{u:'',p:'',name:'',role:'tech',site:'all'};
+  openModal(u?'Edit account':'Add account',u?a.name:'New user',
+   `<div class="fld"><label>Full name</label><input id="ufName" value="${esc(a.name)}"></div>
+    <div class="f2"><div class="fld"><label>Username</label><input id="ufUser" class="mono" value="${esc(a.u)}"
+      ${u?'disabled':''} autocapitalize="none"></div>
+    <div class="fld"><label>Password</label><input id="ufPass" class="mono" value="${esc(a.p)}"></div></div>
+    <div class="f2"><div class="fld"><label>Role</label><select id="ufRole">
+      ${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${a.role===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
+    <div class="fld"><label>Site access</label><select id="ufSite">
+      <option value="all" ${a.site==='all'?'selected':''}>All sites</option>
+      ${S.sites.map(s=>`<option value="${s.id}" ${a.site===s.id?'selected':''}>${esc(s.code)} — ${esc(s.name)}</option>`).join('')}</select></div></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    ${u&&u!==VIEW.user.u?`<button class="btn dgr" onclick="doDelUser('${u}')">Delete</button>`:''}
+    <button class="btn pri" onclick="saveUser('${u||''}')">Save account</button>`);
+}
+function saveUser(u){
+  const name=$('#ufName').value.trim(), user=$('#ufUser').value.trim().toLowerCase(),
+        p=$('#ufPass').value, role=$('#ufRole').value, site=$('#ufSite').value;
+  if(!name||!p)return toast('Name and password are required','bad');
+  if(u){Object.assign(S.users.find(x=>x.u===u),{name,p,role,site});}
+  else{if(!user)return toast('Username is required','bad');
+    if(S.users.some(x=>x.u===user))return toast('That username already exists','bad');
+    S.users.push({u:user,p,name,role,site});}
+  save(); closeModal(); render(); toast('Account saved','good');
+}
+function doDelUser(u){S.users=S.users.filter(x=>x.u!==u);save();closeModal();render();toast('Account deleted','good');}
+function pwModal(){
+  openModal('Change password',VIEW.user.name,
+   `<div class="fld"><label>Current password</label><input id="pwOld" type="password"></div>
+    <div class="fld"><label>New password</label><input id="pwNew" type="password">
+      <div class="hlp">At least 6 characters.</div></div>
+    <div class="fld"><label>Confirm new password</label><input id="pwNew2" type="password"></div>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="doPw()">Update password</button>`);
+}
+function doPw(){
+  const o=$('#pwOld').value, n=$('#pwNew').value, n2=$('#pwNew2').value;
+  const me=S.users.find(x=>x.u===VIEW.user.u);
+  if(o!==me.p)return toast('Current password is not correct','bad');
+  if(n.length<6)return toast('Use at least 6 characters','bad');
+  if(n!==n2)return toast('The two new passwords do not match','bad');
+  me.p=n; VIEW.user.p=n; save(); closeModal(); toast('Password updated','good');
+}
+function saveBrand(){
+  const nm=$('#cfgName').value.trim()||'VoltGrid Store';
+  const f=$('#cfgLogo').files[0];
+  const done=()=>{S.cfg.appName=nm;save();brand();render();toast('Branding updated','good');};
+  if(f){ if(f.size>600000)return toast('Logo must be under 600 KB','bad');
+    const r=new FileReader(); r.onload=e=>{S.cfg.logo=e.target.result;done();}; r.readAsDataURL(f); }
+  else done();
+}
+function clearLogo(){S.cfg.logo='';save();brand();render();toast('Logo removed','good');}
+function saveUrl(){S.cfg.sheetUrl=$('#cfgUrl').value.trim();save();render();
+  toast(S.cfg.sheetUrl?'Sheets URL saved':'Sheets URL cleared','good');}
+
+function prunePhotos(){
+  const used=new Set([...S.parts,...S.tools].map(o=>o.photo).filter(Boolean));
+  const dead=Object.keys(PH).filter(k=>!used.has(k));
+  if(!dead.length)return toast('No unused photos to remove');
+  dead.forEach(k=>delete PH[k]);
+  savePhotos(); render();
+  toast(`Removed ${dead.length} unused photo${dead.length===1?'':'s'}`,'good');
+}
+function clearPhotos(){
+  if(!can('admin'))return toast('Manager access required','bad');
+  openModal('Delete all device photos','Linked images are not affected',
+    `<p style="font-size:13.5px;margin:0">This removes every uploaded photo from this device
+      (${Object.keys(PH).length} images, ${(photoBytes()/1024/1024).toFixed(2)} MB). Parts and tools stay,
+      they just lose their picture. Export a backup first if you want to keep them.</p>`,
+    `<button class="btn" onclick="closeModal()">Cancel</button>
+     <button class="btn dgr" onclick="doClearPhotos()">Delete all photos</button>`);
+}
+function doClearPhotos(){
+  PH={};
+  [...S.parts,...S.tools].forEach(o=>{if(o.photo&&!/^https?:/i.test(o.photo))o.photo='';});
+  savePhotos(); save(); closeModal(); render(); toast('Device photos deleted','good');
+}
+
+/* ---------- data in / out ---------- */
+function dl(name,text,type){const b=new Blob([text],{type:type||'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);}
+function expJSON(){dl(`voltgrid-store-${iso(today())}.json`,
+  JSON.stringify(Object.assign({},S,{_photos:PH}),null,2));toast('Backup downloaded','good');}
+function expCSV(){
+  const head=['SKU','Name','Category','Site','Bin','OnHand','Min','Unit','UnitCost','StockValue','Supplier','LeadDays','Status',
+    'WarrantyMonths','WarrantyFrom','WarrantyUntil','WarrantyStatus','Photo'];
+  const q=v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  const rows=S.parts.map(p=>[p.sku,p.name,p.cat,p.site,p.bin,p.qty,p.min,p.unit,p.cost,(p.qty*p.cost).toFixed(2),
+    p.sup,p.lt,stockState(p),p.war||0,p.warFrom||'',warUntil(p)||'',warState(p),
+    /^https?:/i.test(p.photo||'')?p.photo:(p.photo?'on device':'')].map(q).join(','));
+  dl(`voltgrid-parts-${iso(today())}.csv`,[head.join(','),...rows].join('\n'),'text/csv');
+  toast('Parts CSV downloaded','good');
+}
+function impJSON(inp){
+  const f=inp.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=e=>{try{const d=JSON.parse(e.target.result);
+    if(!d.parts||!d.tools)throw 0;
+    if(d._photos&&typeof d._photos==='object'){PH=d._photos;savePhotos();}
+    delete d._photos;
+    S = migrate(d); if(!S.cfg)S.cfg={appName:'VoltGrid Store',logo:'',sheetUrl:'',poSeq:1};
+    save(); brand(); buildSites(); buildNav(); render(); toast('Backup restored','good');
+  }catch(err){toast('That file is not a VoltGrid backup','bad');} inp.value='';};
+  r.readAsText(f);
+}
+function resetAll(){
+  openModal('Reset to demo data','This cannot be undone',
+   `<p style="font-size:13.5px;margin:0">All parts, tools, orders and activity on this device will be replaced with
+    the original demo set. Export a backup first if you want to keep anything.</p>`,
+   `<button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn dgr" onclick="doReset()">Reset everything</button>`);}
+function doReset(){const me=VIEW.user.u;PH={};savePhotos();S=seed();VIEW.user=S.users.find(u=>u.u===me)||S.users[0];
+  save();brand();buildSites();buildNav();render();closeModal();toast('Reset to demo data','good');}
+
+/* ---------- Google Sheets sync ---------- */
+function setSync(t,cls){$('#syncDot').textContent=t;$('#syncDot').style.color=cls||'';}
+async function syncPush(){
+  if(!S.cfg.sheetUrl)return toast('Add the Apps Script URL first','bad');
+  setSync('● syncing…','#C2740D'); toast('Pushing to Google Sheets…');
+  try{
+    await fetch(S.cfg.sheetUrl,{method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'push',payload:{parts:S.parts,tools:S.tools,pos:S.pos,sites:S.sites,log:S.log.slice(0,200)}})});
+    S.cfg.lastSync=Date.now(); save();
+    setSync('● synced '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),'#8FE3C8');
+    toast('Pushed to Google Sheets','good');
+  }catch(e){setSync('● sync failed','#FF9A92');toast('Could not reach the Sheets endpoint','bad');}
+}
+async function syncPull(){
+  if(!S.cfg.sheetUrl)return toast('Add the Apps Script URL first','bad');
+  setSync('● syncing…','#C2740D');
+  try{
+    const r=await fetch(S.cfg.sheetUrl+'?action=pull');
+    const d=await r.json();
+    if(!d||!d.parts)throw 0;
+    S.parts=d.parts; if(d.tools)S.tools=d.tools; if(d.pos)S.pos=d.pos; if(d.sites)S.sites=d.sites;
+    S.cfg.lastSync=Date.now(); save(); buildSites(); buildNav(); render();
+    setSync('● synced '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),'#8FE3C8');
+    toast('Pulled from Google Sheets','good');
+  }catch(e){setSync('● sync failed','#FF9A92');toast('Could not read from the Sheets endpoint','bad');}
+}
+
+/* ---------- boot ---------- */
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeModal();}});
+(async function boot(){
+  _db=await openDB();
+  PH=(await dbGet(PH_KEY))||{};
+  const saved=await dbGet(LS_KEY);
+  S = (saved&&saved.parts&&saved.parts.length) ? migrate(saved) : seed();
+  if(!S.cfg)S.cfg={appName:'VoltGrid Store',logo:'',sheetUrl:'',poSeq:1};
+  if(!S.log)S.log=[];
+  brand();
+  setSync(S.cfg.sheetUrl?('● '+(S.cfg.lastSync?'synced '+ago(S.cfg.lastSync):'connected')):'● local only');
+  const sess=S.session&&(Date.now()-S.session.at<14*DAY)?S.users.find(u=>u.u===S.session.u):null;
+  if(sess)enter(sess); else {S.session=null; dbSet(LS_KEY,S);}
+})();
+</script>
+</body>
+</html>

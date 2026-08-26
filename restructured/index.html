@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#0D1626">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>VoltGrid Store — Spare Parts &amp; Tools</title>
+  
+  <!-- CSS Modules -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+  <!-- LOCK SCREEN -->
+  <div id="lock">
+    <div class="lk-top">
+      <div class="lk-clock mono" id="lkTime">--:--</div>
+      <div class="lk-date" id="lkDate"></div>
+      <div class="lk-brand">
+        <div id="lkLogo" class="lk-mark">VG</div>
+        <div style="text-align:left">
+          <div class="lk-name" id="lkName">VoltGrid Store</div>
+          <div class="lk-sub">Spare Parts &amp; Tools</div>
+        </div>
+      </div>
+    </div>
+    <div class="lk-form">
+      <div id="lkErr" class="lk-err hide"></div>
+      <div class="lk-field">
+        <input id="lkUser" type="text" placeholder="Username" autocomplete="username"
+          autocapitalize="none" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="lk-field">
+        <input id="lkPass" type="password" placeholder="Password" autocomplete="current-password">
+        <button class="lk-eye" id="lkEye" type="button">Show</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+        <input id="lkRemember" type="checkbox" style="width:16px;height:16px;cursor:pointer">
+        <label for="lkRemember" style="font-size:12px;color:var(--ink3);cursor:pointer;margin:0">Remember me on this device</label>
+      </div>
+      <button class="lk-go" id="lkGo">Sign in</button>
+    </div>
+  </div>
+
+  <!-- APP SHELL -->
+  <div id="app">
+    <div class="scrim" id="scrim"></div>
+    
+    <aside class="rail" id="rail">
+      <div class="rail-head">
+        <div id="rlLogo" class="rail-mark">VG</div>
+        <div style="min-width:0">
+          <div class="rail-nm" id="rlName">VoltGrid Store</div>
+          <div class="rail-sb">Parts &amp; Tools</div>
+        </div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="rail-foot">
+        <span>Version 2.0</span>
+        <span id="syncDot">● offline</span>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="top">
+        <div class="top-in">
+          <button class="burger" id="burger">☰</button>
+          <div style="min-width:0;flex:1">
+            <div class="pg-t" id="pgTitle">Overview</div>
+            <div class="pg-s" id="pgSite"></div>
+          </div>
+          <div class="top-r">
+            <button class="sitebtn" id="siteBtn"></button>
+            <button class="icbtn" id="alertBtn">🔔<span class="dot hide" id="alertDot"></span></button>
+            <button class="avat" id="meBtn">--</button>
+          </div>
+        </div>
+      </header>
+      <div class="wrap" id="page"></div>
+    </div>
+  </div>
+
+  <!-- Floating Elements -->
+  <div class="menu" id="menu"></div>
+  <div class="mask" id="mask"><div class="modal" id="modal"></div></div>
+  <div class="toast" id="toast"></div>
+
+  <!-- JavaScript Modules (load in order) -->
+  <script src="js/config.js"></script>
+  <script src="js/utils/dom.js"></script>
+  <script src="js/utils/formatting.js"></script>
+  <script src="js/utils/math.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/session.js"></script>
+  <script src="js/models/logs.js"></script>
+  <script src="js/models/warranty.js"></script>
+  <script src="js/models/parts.js"></script>
+  <script src="js/models/tools.js"></script>
+  <script src="js/models/pos.js"></script>
+  <script src="js/data/seed.js"></script>
+  <script src="js/ui/toast.js"></script>
+  <script src="js/ui/modals.js"></script>
+  <script src="js/ui/menus.js"></script>
+  <script src="js/ui/photos.js"></script>
+  <script src="js/ui/components.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/pages/home.js"></script>
+  <script src="js/pages/parts.js"></script>
+  <script src="js/pages/tools.js"></script>
+  <script src="js/pages/calibration.js"></script>
+  <script src="js/pages/warranty.js"></script>
+  <script src="js/pages/po.js"></script>
+  <script src="js/pages/log.js"></script>
+  <script src="js/pages/admin.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
