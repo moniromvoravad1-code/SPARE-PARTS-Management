@@ -108,7 +108,12 @@ function renderAdmin() {
               <div class="card-t">Accounts</div>
               <div class="card-s">Role decides what each person can change</div>
             </div>
-            <div class="r"><button class="btn sm pri" onclick="userModal()">＋ Add user</button></div>
+            <div class="r" style="display:flex;gap:8px">
+              <label class="btn sm" style="cursor:pointer">Import list
+                <input type="file" accept="application/json" style="display:none" onchange="impUsers(this)">
+              </label>
+              <button class="btn sm pri" onclick="userModal()">＋ Add user</button>
+            </div>
           </div>
           <div class="card-b flush">
             ${S.users.map((u) => `
@@ -309,6 +314,78 @@ function saveUser(u) {
   closeModal();
   render();
   toast('Account saved', 'good');
+}
+
+/**
+ * Add a list of people from a JSON file, without touching stock or history.
+ *
+ * Accepts either a bare array or { "users": [...] }. Each entry needs at least
+ * a username, a password and a name; position, ID card, role and site are
+ * optional. Existing usernames are left exactly as they are, so importing the
+ * same list twice is safe.
+ */
+function impUsers(inp) {
+  if (!can('admin')) return toast('Manager access required', 'bad');
+
+  const f = inp.files[0];
+  if (!f) return;
+
+  const r = new FileReader();
+
+  r.onload = (e) => {
+    inp.value = '';
+
+    let list;
+    try {
+      const d = JSON.parse(e.target.result);
+      list = Array.isArray(d) ? d : d.users;
+      if (!Array.isArray(list)) throw new Error('no users array');
+    } catch (err) {
+      return toast('That file is not an account list', 'bad');
+    }
+
+    const added = [];
+    const skipped = [];
+    const rejected = [];
+
+    list.forEach((a) => {
+      const u = String(a.u || '').trim().toLowerCase();
+
+      if (!u || !a.p || !a.name) return rejected.push(u || '(no username)');
+      if (!ROLES[a.role]) return rejected.push(u + ' (unknown role)');
+      if (String(a.p).length < 6) return rejected.push(u + ' (password too short)');
+      if (S.users.some((x) => x.u === u)) return skipped.push(u);
+
+      S.users.push({
+        u,
+        p: String(a.p),
+        name: String(a.name),
+        position: a.position ? String(a.position) : '',
+        idCard: a.idCard ? String(a.idCard) : '',
+        role: a.role,
+        site: a.site && a.site !== 'all' && S.sites.some((s) => s.id === a.site) ? a.site : 'all'
+      });
+      added.push(u);
+    });
+
+    if (!added.length && !skipped.length) {
+      return toast('Nothing in that file could be imported', 'bad');
+    }
+
+    if (added.length) {
+      logIt('add', `Imported ${added.length} account${added.length === 1 ? '' : 's'}: ${added.join(', ')}`, 'all');
+      saveState();
+    }
+
+    render();
+
+    const parts = [`${added.length} added`];
+    if (skipped.length) parts.push(`${skipped.length} already here`);
+    if (rejected.length) parts.push(`${rejected.length} rejected`);
+    toast(parts.join(' · '), added.length ? 'good' : null);
+  };
+
+  r.readAsText(f);
 }
 
 /**
