@@ -7,7 +7,7 @@ The monolithic 3000+ line HTML file has been successfully restructured into a mo
 ## 📁 New Structure
 
 ```
-restructured/
+.
 ├── index.html                      # Minimal HTML shell (content only)
 ├── css/
 │   ├── variables.css              # Design tokens & custom properties
@@ -205,10 +205,10 @@ and reusable controls (`stepper`, `partOpts`, `pickOne`, pills, `thumb`) in `ui/
 
 ## 🔄 Migration from Original
 
-The restructured code is **compatible** with the original. You can:
+The modular code is **compatible** with the original. You can:
 
-1. Keep the original file for reference
-2. Gradually use modules from `restructured/`
+1. Keep `voltgrid-store.html` for reference
+2. Gradually use the modules under `js/`
 3. Test new features in isolation
 4. Eventually deprecate the original
 5. Deploy modular version to production
