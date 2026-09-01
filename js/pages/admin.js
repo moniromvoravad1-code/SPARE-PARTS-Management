@@ -738,8 +738,18 @@ async function syncPush() {
  * @throws if the endpoint is unreachable or answers with something unusable
  */
 async function pullData() {
-  const r = await fetch(S.cfg.sheetUrl + '?action=pull');
-  const d = await r.json();
+  // Give up rather than hang: an unreachable or sign-in-walled URL would
+  // otherwise leave the request open indefinitely.
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 15000);
+
+  let d;
+  try {
+    const r = await fetch(S.cfg.sheetUrl + '?action=pull', { signal: stop.signal });
+    d = await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
 
   // A sheet with no Parts tab is almost always a wrong URL or a failed deploy,
   // and overwriting good local data with it would be destructive.

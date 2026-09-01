@@ -152,19 +152,6 @@ async function initApp() {
     // Load device photos before anything can render a thumbnail
     await loadPhotos();
 
-    // With the sheet as the source of truth, read it before the first paint.
-    // A failure here is not fatal — the device keeps working on its own copy.
-    if (S.cfg.autoSync && S.cfg.sheetUrl) {
-      setSync('● reading sheet…', '#C2740D');
-      try {
-        const n = await pullData();
-        console.log(`✓ loaded from Google Sheets: ${n.parts} parts, ${n.tools} tools, ${n.pos} orders`);
-      } catch (e) {
-        console.warn('Could not read the sheet, using the copy on this device:', e.message);
-        toast('Could not reach Google Sheets — using this device’s data', 'bad');
-      }
-    }
-
     // Apply branding
     brand();
     tick();
@@ -175,10 +162,30 @@ async function initApp() {
         ? '● ' + (S.cfg.lastSync ? 'synced ' + ago(S.cfg.lastSync) : 'connected')
         : '● local only'
     );
-    
+
     // Setup auth handlers
     initAuth();
-    
+
+    // Read the sheet only once signing in is possible, so a slow or
+    // unreachable endpoint can never leave the login screen dead.
+    if (S.cfg.autoSync && S.cfg.sheetUrl) {
+      setSync('● reading sheet…', '#C2740D');
+      pullData()
+        .then((n) => {
+          console.log(`✓ loaded from Google Sheets: ${n.parts} parts, ${n.tools} tools, ${n.pos} orders`);
+          setSync('● synced ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), '#8FE3C8');
+          if (VIEW.user) {
+            buildSites();
+            buildNav();
+            render();
+          }
+        })
+        .catch((e) => {
+          console.warn('Could not read the sheet, using the copy on this device:', e.message);
+          setSync('● local only');
+        });
+    }
+
     // Resume previous session if available and enabled
     const rememberMe = localStorage.getItem('voltgrid_rememberMe') === 'true';
     if (S.session && rememberMe) {
