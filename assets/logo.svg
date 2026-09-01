@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="SNT">
+  <title>SNT</title>
+  <g fill="#239B41">
+    <!-- broken ring: two tapered arcs, 180 degrees apart -->
+    <path d="M 58.4 89.3 A 68 68 0 0 1 181.6 89.3 A 83.25 83.25 0 0 0 58.4 89.3 Z"/>
+    <path d="M 58.4 89.3 A 68 68 0 0 1 181.6 89.3 A 83.25 83.25 0 0 0 58.4 89.3 Z"
+          transform="rotate(180 120 118)"/>
+
+    <!-- N, with the apostrophe slash punched out of the right stem -->
+    <path fill-rule="evenodd" d="M 100 88 L 116 88 L 142 119.5 L 142 88 L 158 88 L 158 145
+                                 L 142 145 L 116 113.5 L 116 145 L 100 145 Z
+                                 M 142 105 L 158 88 L 161.54 91.54 L 145.54 108.54 Z"/>
+
+    <!-- T, angled left end on the crossbar -->
+    <path d="M 183 88 L 224 88 L 224 105 L 207 105 L 207 145 L 190 145 L 190 105 L 166 105 Z"/>
+  </g>
+
+  <!-- S, drawn as a stroked spine so the weight stays even -->
+  <path fill="none" stroke="#239B41" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"
+        d="M 94 96 L 43 96 A 10 10 0 0 0 33 106 L 33 106.5 A 10 10 0 0 0 43 116.5
+           L 76 116.5 A 10 10 0 0 1 86 126.5 L 86 127 A 10 10 0 0 1 76 137 L 25 137"/>
+</svg>

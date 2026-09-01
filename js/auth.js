@@ -110,6 +110,14 @@ function doLogin() {
   
   // Find matching user
   const acc = S.users.find((x) => x.u === u && x.p === p);
+
+  // A deactivated account is refused even with the right password
+  if (acc && acc.active === 0) {
+    showLoginError('This account has been deactivated. Ask a manager to re-enable it.');
+    logIt('login_failed', `Sign-in refused, account deactivated: ${u}`, 'all', { user: u });
+    $('#lkPass').value = '';
+    return;
+  }
   
   if (!acc) {
     const attempt = recordFailedAttempt();
@@ -212,8 +220,12 @@ function showTimeoutWarning() {
  */
 function enter(acc, rememberMe = false) {
   VIEW.user = acc;
-  VIEW.site = acc.site && acc.site !== 'all' ? acc.site : 'all';
-  VIEW.page = ROLES[acc.role].pages[0];
+
+  // An account tied to exactly one warehouse opens on it; otherwise "all",
+  // which mySiteIds() already narrows to the warehouses it may reach.
+  const ids = siteIdsFor(acc);
+  VIEW.site = ids.length === 1 ? ids[0] : 'all';
+  VIEW.page = landingPage();
   
   // Store session info
   S.session = {

@@ -6,28 +6,29 @@
 Open `index.html` in a modern browser (Chrome, Firefox, Safari, Edge).
 
 You should see the **Lock Screen** with:
-- VoltGrid Store logo
+- SPARE PARTS MANAGEMENT SYSTEM logo
 - Current date and time
 - Login form
 
 ### 2. Starter Accounts
 
-The app creates one account per role on first run:
+The app ships with a single account, used to set everything else up:
 
 | Account | Username | Password | Role | Sees |
 |------|----------|----------|------|--------|
-| Store Manager | `manager` | `manager123` | manager | Everything, incl. Activity Log and Settings |
-| Store Keeper | `storekeeper` | `store123` | storekeeper | All stock and tool operations, raises orders |
-| Site Technician | `tech` | `tech123` | tech | Issues parts, books tools out |
-| Read Only | `guest` | `guest123` | guest | Stock, tools, calibration and warranty only |
+| Store Manager | `manager` | `Snt1X6ePdYH6` | manager | Everything, incl. Activity Log and Settings |
 
-These are placeholders for evaluating the app. Sign in as the manager, add your
-real team under **Settings → Accounts**, then change these passwords or delete
-these accounts. Never commit real staff credentials to a shared repository.
+This is the only account the app ships with, and its password is readable in the
+page source, so treat it as a setup key rather than a secret. Sign in as the
+manager, change that password under your own account, then create the real team
+under **Settings → Accounts**, where each person gets their own password,
+assigned warehouses and module permissions.
+
+Never commit real staff credentials to a shared repository — this repo is public.
 
 ### 3. Signing In
 1. Type username: `manager`
-2. Type password: `manager123`
+2. Type password: `Snt1X6ePdYH6`
 3. Click "Sign in" button
 
 ### 4. After Login

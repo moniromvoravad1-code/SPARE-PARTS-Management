@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0D1626">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VoltGrid Store — Spare Parts &amp; Tools</title>
+<title>SPARE PARTS MANAGEMENT SYSTEM — Spare Parts &amp; Tools</title>
 <style>
 :root{
   --bg:#EDF1F6; --surface:#fff; --surface2:#F6F9FC; --surface3:#EEF3F9;
@@ -48,7 +48,7 @@ a{color:var(--brand);text-decoration:none}
 .lk-clock{font-family:var(--mono);font-size:60px;font-weight:200;letter-spacing:-2px;line-height:1}
 .lk-date{color:#8FA3BE;font-size:13px;margin-top:8px;letter-spacing:.5px}
 .lk-brand{display:flex;align-items:center;gap:10px;margin-top:34px}
-.lk-brand img{width:38px;height:38px;border-radius:9px;object-fit:cover}
+.lk-brand img{width:38px;height:38px;border-radius:9px;object-fit:contain;background:#fff}
 .lk-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(140deg,var(--brand2),#0B5F70);
   display:grid;place-items:center;font-weight:800;font-size:16px}
 .lk-name{font-size:19px;font-weight:700;letter-spacing:-.3px}
@@ -78,7 +78,7 @@ a{color:var(--brand);text-decoration:none}
 .rail{position:fixed;top:0;left:0;bottom:0;width:236px;background:var(--rail);z-index:60;
   display:flex;flex-direction:column;padding-top:var(--sat);transition:transform .22s ease}
 .rail-head{padding:16px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--rail3)}
-.rail-head img{width:32px;height:32px;border-radius:8px;object-fit:cover;flex:none}
+.rail-head img{width:32px;height:32px;border-radius:8px;object-fit:contain;background:#fff;flex:none}
 .rail-mark{width:32px;height:32px;border-radius:8px;flex:none;background:linear-gradient(140deg,var(--brand2),#0B5F70);
   display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px}
 .rail-nm{color:#fff;font-weight:700;font-size:14.5px;letter-spacing:-.2px;line-height:1.2}
@@ -380,9 +380,9 @@ a{color:var(--brand);text-decoration:none}
     <div class="lk-clock mono" id="lkTime">--:--</div>
     <div class="lk-date" id="lkDate"></div>
     <div class="lk-brand">
-      <div id="lkLogo" class="lk-mark">VG</div>
+      <div id="lkLogo" class="lk-mark">SNT</div>
       <div style="text-align:left">
-        <div class="lk-name" id="lkName">VoltGrid Store</div>
+        <div class="lk-name" id="lkName">SPARE PARTS MANAGEMENT SYSTEM</div>
         <div class="lk-sub">Spare Parts &amp; Tools</div>
       </div>
     </div>
@@ -398,10 +398,10 @@ a{color:var(--brand);text-decoration:none}
     <button class="lk-go" id="lkGo">Sign in</button>
     <div class="lk-hint">Demo accounts — tap to fill</div>
     <div class="lk-chips">
-      <button class="lk-chip" data-u="manager" data-p="manager123">Manager</button>
-      <button class="lk-chip" data-u="storekeeper" data-p="store123">Storekeeper</button>
-      <button class="lk-chip" data-u="tech" data-p="tech123">Technician</button>
-      <button class="lk-chip" data-u="guest" data-p="guest123">Guest</button>
+      <button class="lk-chip" data-u="manager" data-p="VgManage2026">Manager</button>
+      <button class="lk-chip" data-u="storekeeper" data-p="VgStore2026">Storekeeper</button>
+      <button class="lk-chip" data-u="tech" data-p="VgTech2026">Technician</button>
+      <button class="lk-chip" data-u="guest" data-p="VgGuest2026">Guest</button>
     </div>
   </div>
 </div>
@@ -412,9 +412,9 @@ a{color:var(--brand);text-decoration:none}
 
   <aside class="rail" id="rail">
     <div class="rail-head">
-      <div id="rlLogo" class="rail-mark">VG</div>
+      <div id="rlLogo" class="rail-mark">SNT</div>
       <div style="min-width:0">
-        <div class="rail-nm" id="rlName">VoltGrid Store</div>
+        <div class="rail-nm" id="rlName">SPARE PARTS MANAGEMENT SYSTEM</div>
         <div class="rail-sb">Parts &amp; Tools</div>
       </div>
     </div>
@@ -451,7 +451,7 @@ a{color:var(--brand);text-decoration:none}
 <script>
 "use strict";
 /* =========================================================
-   VoltGrid Store — Spare Parts, Tools, Calibration, Purchasing
+   SPARE PARTS MANAGEMENT SYSTEM — Spare Parts, Tools, Calibration, Purchasing
    Single-file app. IndexedDB primary, localStorage fallback.
    ========================================================= */
 
@@ -660,13 +660,13 @@ function seed(){
   log.sort((a,b)=>b.ts-a.ts);
   /* Starter accounts, one per role. Placeholders — add real staff in Settings. */
   const users=[
-    {u:'manager',p:'manager123',name:'Store Manager',position:'Manager',idCard:'0001',role:'manager',site:'all'},
-    {u:'storekeeper',p:'store123',name:'Store Keeper',position:'Storekeeper',idCard:'0002',role:'storekeeper',site:'all'},
-    {u:'tech',p:'tech123',name:'Site Technician',position:'Engineer',idCard:'0003',role:'tech',site:'all'},
-    {u:'guest',p:'guest123',name:'Read Only',position:'Visitor',idCard:'0004',role:'guest',site:'all'}
+    {u:'manager',p:'VgManage2026',name:'Store Manager',position:'Manager',idCard:'0001',role:'manager',site:'all'},
+    {u:'storekeeper',p:'VgStore2026',name:'Store Keeper',position:'Storekeeper',idCard:'0002',role:'storekeeper',site:'all'},
+    {u:'tech',p:'VgTech2026',name:'Site Technician',position:'Engineer',idCard:'0003',role:'tech',site:'all'},
+    {u:'guest',p:'VgGuest2026',name:'Read Only',position:'Visitor',idCard:'0004',role:'guest',site:'all'}
   ];
   return {v:3,sites,parts,tools,pos,log,users,
-    cfg:{appName:'VoltGrid Store',logo:'',sheetUrl:'',autoSync:false,poSeq:15},
+    cfg:{appName:'SPARE PARTS MANAGEMENT SYSTEM',logo:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNOVCI+CiAgPHRpdGxlPlNOVDwvdGl0bGU+CiAgPGcgZmlsbD0iIzIzOUI0MSI+CiAgICA8IS0tIGJyb2tlbiByaW5nOiB0d28gdGFwZXJlZCBhcmNzLCAxODAgZGVncmVlcyBhcGFydCAtLT4KICAgIDxwYXRoIGQ9Ik0gNTguNCA4OS4zIEEgNjggNjggMCAwIDEgMTgxLjYgODkuMyBBIDgzLjI1IDgzLjI1IDAgMCAwIDU4LjQgODkuMyBaIi8+CiAgICA8cGF0aCBkPSJNIDU4LjQgODkuMyBBIDY4IDY4IDAgMCAxIDE4MS42IDg5LjMgQSA4My4yNSA4My4yNSAwIDAgMCA1OC40IDg5LjMgWiIKICAgICAgICAgIHRyYW5zZm9ybT0icm90YXRlKDE4MCAxMjAgMTE4KSIvPgoKICAgIDwhLS0gTiwgd2l0aCB0aGUgYXBvc3Ryb3BoZSBzbGFzaCBwdW5jaGVkIG91dCBvZiB0aGUgcmlnaHQgc3RlbSAtLT4KICAgIDxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTSAxMDAgODggTCAxMTYgODggTCAxNDIgMTE5LjUgTCAxNDIgODggTCAxNTggODggTCAxNTggMTQ1CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEwgMTQyIDE0NSBMIDExNiAxMTMuNSBMIDExNiAxNDUgTCAxMDAgMTQ1IFoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTSAxNDIgMTA1IEwgMTU4IDg4IEwgMTYxLjU0IDkxLjU0IEwgMTQ1LjU0IDEwOC41NCBaIi8+CgogICAgPCEtLSBULCBhbmdsZWQgbGVmdCBlbmQgb24gdGhlIGNyb3NzYmFyIC0tPgogICAgPHBhdGggZD0iTSAxODMgODggTCAyMjQgODggTCAyMjQgMTA1IEwgMjA3IDEwNSBMIDIwNyAxNDUgTCAxOTAgMTQ1IEwgMTkwIDEwNSBMIDE2NiAxMDUgWiIvPgogIDwvZz4KCiAgPCEtLSBTLCBkcmF3biBhcyBhIHN0cm9rZWQgc3BpbmUgc28gdGhlIHdlaWdodCBzdGF5cyBldmVuIC0tPgogIDxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIzOUI0MSIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiCiAgICAgICAgZD0iTSA5NCA5NiBMIDQzIDk2IEEgMTAgMTAgMCAwIDAgMzMgMTA2IEwgMzMgMTA2LjUgQSAxMCAxMCAwIDAgMCA0MyAxMTYuNQogICAgICAgICAgIEwgNzYgMTE2LjUgQSAxMCAxMCAwIDAgMSA4NiAxMjYuNSBMIDg2IDEyNyBBIDEwIDEwIDAgMCAxIDc2IDEzNyBMIDI1IDEzNyIvPgo8L3N2Zz4K',sheetUrl:'',autoSync:false,poSeq:15},
     session:null};
 }
 
@@ -2324,7 +2324,7 @@ function doPw(){
   me.p=n; VIEW.user.p=n; save(); closeModal(); toast('Password updated','good');
 }
 function saveBrand(){
-  const nm=$('#cfgName').value.trim()||'VoltGrid Store';
+  const nm=$('#cfgName').value.trim()||'SPARE PARTS MANAGEMENT SYSTEM';
   const f=$('#cfgLogo').files[0];
   const done=()=>{S.cfg.appName=nm;save();brand();render();toast('Branding updated','good');};
   if(f){ if(f.size>600000)return toast('Logo must be under 600 KB','bad');
@@ -2380,9 +2380,9 @@ function impJSON(inp){
     if(!d.parts||!d.tools)throw 0;
     if(d._photos&&typeof d._photos==='object'){PH=d._photos;savePhotos();}
     delete d._photos;
-    S = migrate(d); if(!S.cfg)S.cfg={appName:'VoltGrid Store',logo:'',sheetUrl:'',poSeq:1};
+    S = migrate(d); if(!S.cfg)S.cfg={appName:'SPARE PARTS MANAGEMENT SYSTEM',logo:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNOVCI+CiAgPHRpdGxlPlNOVDwvdGl0bGU+CiAgPGcgZmlsbD0iIzIzOUI0MSI+CiAgICA8IS0tIGJyb2tlbiByaW5nOiB0d28gdGFwZXJlZCBhcmNzLCAxODAgZGVncmVlcyBhcGFydCAtLT4KICAgIDxwYXRoIGQ9Ik0gNTguNCA4OS4zIEEgNjggNjggMCAwIDEgMTgxLjYgODkuMyBBIDgzLjI1IDgzLjI1IDAgMCAwIDU4LjQgODkuMyBaIi8+CiAgICA8cGF0aCBkPSJNIDU4LjQgODkuMyBBIDY4IDY4IDAgMCAxIDE4MS42IDg5LjMgQSA4My4yNSA4My4yNSAwIDAgMCA1OC40IDg5LjMgWiIKICAgICAgICAgIHRyYW5zZm9ybT0icm90YXRlKDE4MCAxMjAgMTE4KSIvPgoKICAgIDwhLS0gTiwgd2l0aCB0aGUgYXBvc3Ryb3BoZSBzbGFzaCBwdW5jaGVkIG91dCBvZiB0aGUgcmlnaHQgc3RlbSAtLT4KICAgIDxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTSAxMDAgODggTCAxMTYgODggTCAxNDIgMTE5LjUgTCAxNDIgODggTCAxNTggODggTCAxNTggMTQ1CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEwgMTQyIDE0NSBMIDExNiAxMTMuNSBMIDExNiAxNDUgTCAxMDAgMTQ1IFoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTSAxNDIgMTA1IEwgMTU4IDg4IEwgMTYxLjU0IDkxLjU0IEwgMTQ1LjU0IDEwOC41NCBaIi8+CgogICAgPCEtLSBULCBhbmdsZWQgbGVmdCBlbmQgb24gdGhlIGNyb3NzYmFyIC0tPgogICAgPHBhdGggZD0iTSAxODMgODggTCAyMjQgODggTCAyMjQgMTA1IEwgMjA3IDEwNSBMIDIwNyAxNDUgTCAxOTAgMTQ1IEwgMTkwIDEwNSBMIDE2NiAxMDUgWiIvPgogIDwvZz4KCiAgPCEtLSBTLCBkcmF3biBhcyBhIHN0cm9rZWQgc3BpbmUgc28gdGhlIHdlaWdodCBzdGF5cyBldmVuIC0tPgogIDxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIzOUI0MSIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiCiAgICAgICAgZD0iTSA5NCA5NiBMIDQzIDk2IEEgMTAgMTAgMCAwIDAgMzMgMTA2IEwgMzMgMTA2LjUgQSAxMCAxMCAwIDAgMCA0MyAxMTYuNQogICAgICAgICAgIEwgNzYgMTE2LjUgQSAxMCAxMCAwIDAgMSA4NiAxMjYuNSBMIDg2IDEyNyBBIDEwIDEwIDAgMCAxIDc2IDEzNyBMIDI1IDEzNyIvPgo8L3N2Zz4K',sheetUrl:'',poSeq:1};
     save(); brand(); buildSites(); buildNav(); render(); toast('Backup restored','good');
-  }catch(err){toast('That file is not a VoltGrid backup','bad');} inp.value='';};
+  }catch(err){toast('That file is not an SNT backup','bad');} inp.value='';};
   r.readAsText(f);
 }
 function resetAll(){
@@ -2429,7 +2429,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeModa
   PH=(await dbGet(PH_KEY))||{};
   const saved=await dbGet(LS_KEY);
   S = (saved&&saved.parts&&saved.parts.length) ? migrate(saved) : seed();
-  if(!S.cfg)S.cfg={appName:'VoltGrid Store',logo:'',sheetUrl:'',poSeq:1};
+  if(!S.cfg)S.cfg={appName:'SPARE PARTS MANAGEMENT SYSTEM',logo:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNOVCI+CiAgPHRpdGxlPlNOVDwvdGl0bGU+CiAgPGcgZmlsbD0iIzIzOUI0MSI+CiAgICA8IS0tIGJyb2tlbiByaW5nOiB0d28gdGFwZXJlZCBhcmNzLCAxODAgZGVncmVlcyBhcGFydCAtLT4KICAgIDxwYXRoIGQ9Ik0gNTguNCA4OS4zIEEgNjggNjggMCAwIDEgMTgxLjYgODkuMyBBIDgzLjI1IDgzLjI1IDAgMCAwIDU4LjQgODkuMyBaIi8+CiAgICA8cGF0aCBkPSJNIDU4LjQgODkuMyBBIDY4IDY4IDAgMCAxIDE4MS42IDg5LjMgQSA4My4yNSA4My4yNSAwIDAgMCA1OC40IDg5LjMgWiIKICAgICAgICAgIHRyYW5zZm9ybT0icm90YXRlKDE4MCAxMjAgMTE4KSIvPgoKICAgIDwhLS0gTiwgd2l0aCB0aGUgYXBvc3Ryb3BoZSBzbGFzaCBwdW5jaGVkIG91dCBvZiB0aGUgcmlnaHQgc3RlbSAtLT4KICAgIDxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTSAxMDAgODggTCAxMTYgODggTCAxNDIgMTE5LjUgTCAxNDIgODggTCAxNTggODggTCAxNTggMTQ1CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEwgMTQyIDE0NSBMIDExNiAxMTMuNSBMIDExNiAxNDUgTCAxMDAgMTQ1IFoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTSAxNDIgMTA1IEwgMTU4IDg4IEwgMTYxLjU0IDkxLjU0IEwgMTQ1LjU0IDEwOC41NCBaIi8+CgogICAgPCEtLSBULCBhbmdsZWQgbGVmdCBlbmQgb24gdGhlIGNyb3NzYmFyIC0tPgogICAgPHBhdGggZD0iTSAxODMgODggTCAyMjQgODggTCAyMjQgMTA1IEwgMjA3IDEwNSBMIDIwNyAxNDUgTCAxOTAgMTQ1IEwgMTkwIDEwNSBMIDE2NiAxMDUgWiIvPgogIDwvZz4KCiAgPCEtLSBTLCBkcmF3biBhcyBhIHN0cm9rZWQgc3BpbmUgc28gdGhlIHdlaWdodCBzdGF5cyBldmVuIC0tPgogIDxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIzOUI0MSIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiCiAgICAgICAgZD0iTSA5NCA5NiBMIDQzIDk2IEEgMTAgMTAgMCAwIDAgMzMgMTA2IEwgMzMgMTA2LjUgQSAxMCAxMCAwIDAgMCA0MyAxMTYuNQogICAgICAgICAgIEwgNzYgMTE2LjUgQSAxMCAxMCAwIDAgMSA4NiAxMjYuNSBMIDg2IDEyNyBBIDEwIDEwIDAgMCAxIDc2IDEzNyBMIDI1IDEzNyIvPgo8L3N2Zz4K',sheetUrl:'',poSeq:1};
   if(!S.log)S.log=[];
   brand();
   setSync(S.cfg.sheetUrl?('● '+(S.cfg.lastSync?'synced '+ago(S.cfg.lastSync):'connected')):'● local only');

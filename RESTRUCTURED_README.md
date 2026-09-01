@@ -1,4 +1,4 @@
-# VoltGrid Store - Restructured Architecture
+# SPARE PARTS MANAGEMENT SYSTEM - Restructured Architecture
 
 ## Overview
 Converted from single monolithic HTML file to modular structure for better maintainability.

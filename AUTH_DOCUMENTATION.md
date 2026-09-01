@@ -2,7 +2,7 @@
 
 ## Overview
 
-The VoltGrid Store application includes a comprehensive authentication and session management system with advanced security features. This document covers all authentication workflows, security measures, and session management capabilities.
+The SPARE PARTS MANAGEMENT SYSTEM application includes a comprehensive authentication and session management system with advanced security features. This document covers all authentication workflows, security measures, and session management capabilities.
 
 ## File Structure
 

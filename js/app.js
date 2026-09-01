@@ -33,8 +33,19 @@ const PAGE_LISTS = {
 function render() {
   if (!VIEW.user) return;
 
-  // Fall back to the first page this role can see
-  if (!canSee(VIEW.page)) VIEW.page = ROLES[VIEW.user.role].pages[0];
+  // Fall back to the first page this account can open
+  if (!canSee(VIEW.page)) VIEW.page = landingPage();
+
+  // Every module revoked: say so plainly instead of rendering a blank shell
+  if (!VIEW.page) {
+    $('#pgTitle').textContent = 'No access';
+    $('#pgSite').textContent = '';
+    $('#page').innerHTML = empty('🔒', 'No modules enabled',
+      'This account has no modules turned on. A manager can grant access in Settings → Accounts.');
+    buildNav();
+    $('#alertDot').classList.add('hide');
+    return;
+  }
 
   $('#pgTitle').textContent = pageTitle(VIEW.page);
   buildSites();
@@ -62,6 +73,7 @@ function bind() {
   if (q) {
     q.oninput = (e) => {
       VIEW.q = e.target.value;
+      VIEW.sel = [];
       repaint();
     };
   }
@@ -69,6 +81,7 @@ function bind() {
   $$('[data-filter]').forEach((el) => {
     el.onchange = (e) => {
       VIEW[el.dataset.filter] = e.target.value;
+      VIEW.sel = [];
       repaint();
     };
   });
@@ -76,6 +89,7 @@ function bind() {
   $$('[data-tab]').forEach((el) => {
     el.onclick = () => {
       VIEW.tab = el.dataset.tab;
+      VIEW.sel = [];
       render();
     };
   });
@@ -101,7 +115,7 @@ function repaint() {
  */
 function brand() {
   const c = S.cfg;
-  const ini = (c.appName || 'VG')
+  const ini = (c.appName || 'SNT')
     .split(' ')
     .map((x) => x[0])
     .join('')
@@ -186,22 +200,25 @@ async function initApp() {
         });
     }
 
-    // Resume previous session if available and enabled
+    // Resume the session left behind by the last visit. Refreshing the page
+    // should never throw the user back to the lock screen — only an explicit
+    // sign-out, which clears S.session, or a session past the ceiling does
+    // that. "Remember me" lifts the ceiling so the sign-in also survives
+    // closing the browser.
     const rememberMe = localStorage.getItem('voltgrid_rememberMe') === 'true';
-    if (S.session && rememberMe) {
-      const user = S.users.find((u) => u.u === S.session.u);
+    const resumable = S.session &&
+      (rememberMe || Date.now() - S.session.at < SESSION_CONFIG.maxSessionDuration);
+
+    if (resumable) {
+      const user = S.users.find((u) => u.u === S.session.u && u.active !== 0);
       if (user) {
-        // Auto-login with remembered session
-        logIt('auto_login', `Auto-login from remembered session: ${user.name}`, 'all', {
-          user: user.u
-        });
-        enter(user, true);
-        initSessionTracking();
+        logIt('auto_login', `Resumed session: ${user.name}`, 'all', { user: user.u });
+        enter(user, rememberMe);
       }
     }
     
     APP_READY = true;
-    console.log('✓ VoltGrid Store initialized');
+    console.log('✓ SPARE PARTS MANAGEMENT SYSTEM initialized');
   } catch (e) {
     console.error('Initialization error:', e);
     toast('Failed to initialize application', 'bad');

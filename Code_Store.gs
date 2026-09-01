@@ -1,5 +1,5 @@
 /**
- * VoltGrid Store — Google Sheets backend
+ * SPARE PARTS MANAGEMENT SYSTEM — Google Sheets backend
  * Companion to voltgrid-store.html
  *
  * SETUP
@@ -54,7 +54,7 @@ function doPost(e) {
 function doGet(e) {
   try {
     if (e && e.parameter && e.parameter.action === 'pull') return json(readAll());
-    return json({ ok: true, message: 'VoltGrid Store endpoint is live. Use ?action=pull' });
+    return json({ ok: true, message: 'SPARE PARTS MANAGEMENT SYSTEM endpoint is live. Use ?action=pull' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
@@ -202,7 +202,7 @@ function emailLowStock() {
   var lines = parts.map(function (p) {
     return '• ' + p.name + ' (' + p.sku + ') — ' + p.qty + ' of min ' + p.min + ' at ' + p.site;
   }).join('\n');
-  MailApp.sendEmail(TO, 'VoltGrid Store: ' + parts.length + ' items below minimum',
+  MailApp.sendEmail(TO, 'SPARE PARTS MANAGEMENT SYSTEM: ' + parts.length + ' items below minimum',
     'These parts are at or below their minimum level:\n\n' + lines +
     '\n\nOpen the store app to raise a purchase order.');
 }

@@ -118,7 +118,7 @@ function renderAdmin() {
           <div class="card-h">
             <div>
               <div class="card-t">Accounts</div>
-              <div class="card-s">Role decides what each person can change</div>
+              <div class="card-s">${S.users.length} users · permissions are set per account</div>
             </div>
             <div class="r" style="display:flex;gap:8px">
               <label class="btn sm" style="cursor:pointer">Import list
@@ -134,21 +134,21 @@ function renderAdmin() {
                 <div style="min-width:0">
                   <div class="al-t">${esc(u.name)}</div>
                   <div class="al-s mono">
-                    ${esc(u.u)} · ${can('creds') ? esc(u.p) : '••••••••'} · ${u.site === 'all' ? 'all sites' : esc(u.site)}
+                    ${esc(u.u)} · ${canDo('admin', 'accounts') ? esc(u.p) : '••••••••'} · ${esc(siteSummary(u))}
                   </div>
+                  <div class="al-s">${esc(permSummary(u))}</div>
                 </div>
                 <div class="al-r">
-                  <span class="pill br">${ROLES[u.role].label}</span>
+                  <span class="pill br">${ROLES[u.role] ? esc(ROLES[u.role].label) : esc(u.role)}</span>
+                  ${u.active === 0 ? '<span class="pill out">Inactive</span>' : ''}
                   <div style="margin-top:5px"><button class="btn sm" onclick="userModal('${u.u}')">Edit</button></div>
                 </div>
               </div>
             `).join('')}
           </div>
           <div class="card-b" style="border-top:1px solid var(--line);font-size:12px;color:var(--ink2)">
-            <b>Manager</b> full control incl. PO approval and accounts ·
-            <b>Storekeeper</b> all stock and tool operations, raises orders ·
-            <b>Technician</b> issues parts and books tools out to themselves ·
-            <b>Guest</b> read only.
+            ${Object.values(ROLES).map((r) => `<b>${esc(r.label)}</b> ${esc(r.blurb)}`).join(' · ')}.
+            Each account starts from its role template and can then be tuned on its own.
           </div>
         </div>`
       : ''}
@@ -264,14 +264,192 @@ function doDelSite(id) {
 /* ---------- accounts ---------- */
 
 /**
- * Add or edit an account
+ * "3 of 8 modules" for the accounts list
+ */
+function permSummary(u) {
+  const p = permsFor(u);
+  const on = MODULES.filter((m) => p[m.id].view);
+  return on.length === MODULES.length
+    ? 'All modules'
+    : on.length
+      ? `${on.length} of ${MODULES.length} modules · ${on.map((m) => m.t).join(', ')}`
+      : 'No modules enabled';
+}
+
+/**
+ * Which warehouses an account reaches, for the accounts list
+ */
+function siteSummary(u) {
+  const ids = siteIdsFor(u);
+  return ids.length >= S.sites.length ? 'all warehouses' : ids.join(', ');
+}
+
+/**
+ * Working copy of the permissions being edited, so toggles can be cancelled.
+ */
+let PERM_DRAFT = null;
+let SITE_DRAFT = [];
+
+/**
+ * The permission matrix: one row per module, one column per core action.
+ */
+function permMatrixHtml() {
+  return `
+    <table class="permtbl">
+      <thead>
+        <tr>
+          <th class="mod">Module</th>
+          ${CORE_ACTS.map((a) => `<th>${esc(ACT_LABEL[a])}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${MODULES.map((m) => `
+          <tr class="${PERM_DRAFT[m.id].view ? '' : 'off'}">
+            <td class="mod"><b>${esc(m.t)}</b></td>
+            ${CORE_ACTS.map((a) => {
+              if (!m.acts.includes(a)) return '<td class="na">—</td>';
+              const on = PERM_DRAFT[m.id][a] ? 'checked' : '';
+              const dim = a !== 'view' && !PERM_DRAFT[m.id].view ? 'disabled' : '';
+              return `<td><input type="checkbox" ${on} ${dim}
+                onchange="permSet('${m.id}','${a}',this.checked)"></td>`;
+            }).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+/**
+ * Module-specific operations that do not fit the matrix columns.
+ */
+function permOpsHtml() {
+  return `
+    <div class="permops">
+      ${MODULES.map((m) => {
+        const extra = m.acts.filter((a) => !CORE_ACTS.includes(a));
+        if (!extra.length) return '';
+        return `
+          <div class="grp">${esc(m.t)}</div>
+          ${extra.map((a) => `
+            <label>
+              <input type="checkbox" ${PERM_DRAFT[m.id][a] ? 'checked' : ''}
+                ${PERM_DRAFT[m.id].view ? '' : 'disabled'}
+                onchange="permSet('${m.id}','${a}',this.checked)">
+              ${esc(ACT_LABEL[a] || a)}
+            </label>
+          `).join('')}
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+/**
+ * Flip one permission in the draft and repaint the matrix.
+ * Turning a module off clears everything under it; granting any action
+ * implies being able to open the module.
+ */
+function permSet(mod, act, on) {
+  PERM_DRAFT[mod][act] = on ? 1 : 0;
+
+  if (act === 'view' && !on) {
+    Object.keys(PERM_DRAFT[mod]).forEach((k) => (PERM_DRAFT[mod][k] = 0));
+  }
+  if (act !== 'view' && on) PERM_DRAFT[mod].view = 1;
+
+  const host = $('#permHost');
+  if (host) host.innerHTML = permMatrixHtml();
+
+  const ops = $('#permOps');
+  if (ops) ops.innerHTML = permOpsHtml();
+}
+
+/**
+ * Enable all / disable all / reset to the role template
+ */
+function permBulk(mode) {
+  const role = $('#ufRole') ? $('#ufRole').value : 'guest';
+  const tpl = ROLES[role] || ROLES.guest;
+
+  PERM_DRAFT = mode === 'all' ? allPerms()
+    : mode === 'none' ? noPerms()
+    : JSON.parse(JSON.stringify(tpl.perms));
+
+  permSet('home', 'view', !!PERM_DRAFT.home.view);
+
+  toast(mode === 'all' ? 'Everything enabled'
+    : mode === 'none' ? 'Everything disabled'
+    : `Reset to the ${tpl.label} default`);
+}
+
+/**
+ * Tick or clear one warehouse in the draft
+ */
+function siteSet(id, on) {
+  SITE_DRAFT = on ? [...new Set([...SITE_DRAFT, id])] : SITE_DRAFT.filter((x) => x !== id);
+
+  const host = $('#siteHost');
+  if (host) host.innerHTML = sitePickHtml();
+}
+
+/**
+ * Tick or clear every warehouse
+ */
+function siteSetAll(on) {
+  SITE_DRAFT = on ? S.sites.map((s) => s.id) : [];
+
+  const host = $('#siteHost');
+  if (host) host.innerHTML = sitePickHtml();
+}
+
+/**
+ * Warehouse assignment list
+ */
+function sitePickHtml() {
+  const all = SITE_DRAFT.length >= S.sites.length;
+
+  return `
+    <div class="sitepick">
+      <label style="grid-column:1/-1;font-weight:600">
+        <input type="checkbox" ${all ? 'checked' : ''} onchange="siteSetAll(this.checked)">
+        All warehouses
+      </label>
+      ${S.sites.map((s) => `
+        <label>
+          <input type="checkbox" ${SITE_DRAFT.includes(s.id) ? 'checked' : ''}
+            onchange="siteSet('${s.id}',this.checked)">
+          <span class="mono">${esc(s.code)}</span> ${esc(s.name)}
+        </label>
+      `).join('')}
+    </div>
+    <div class="hlp">
+      ${SITE_DRAFT.length
+        ? `Sees stock from ${SITE_DRAFT.length} of ${S.sites.length} warehouses.`
+        : 'None ticked — the account sees every warehouse.'}
+    </div>
+  `;
+}
+
+/**
+ * Add or edit an account, with its module permissions and warehouse access
  */
 function userModal(u) {
-  if (!can('admin')) return toast('Manager access required', 'bad');
+  if (!canDo('admin', 'accounts')) return toast('Manager access required', 'bad');
 
-  const a = u ? S.users.find((x) => x.u === u) : { u: '', p: '', name: '', role: 'tech', site: 'all' };
+  const a = u
+    ? S.users.find((x) => x.u === u)
+    : { u: '', p: '', name: '', role: 'tech', site: 'all', active: 1 };
 
-  openModal(u ? 'Edit account' : 'Add account', u ? a.name : 'New user', `
+  const self = !!u && u === VIEW.user.u;
+  const editPerms = canDo('admin', 'perms');
+
+  PERM_DRAFT = permsFor(a);
+  SITE_DRAFT = Array.isArray(a.sites)
+    ? a.sites.slice()
+    : (a.site && a.site !== 'all' ? [a.site] : []);
+
+  openModal(u ? 'Edit user' : 'Add user', u ? a.name : 'New account', `
     <div class="fld"><label>Full name</label><input id="ufName" value="${esc(a.name)}"></div>
     <div class="f2">
       <div class="fld">
@@ -282,48 +460,139 @@ function userModal(u) {
     </div>
     <div class="f2">
       <div class="fld">
-        <label>Role</label>
+        <label>Role template</label>
         <select id="ufRole">
-          ${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${a.role === k ? 'selected' : ''}>${v.label}</option>`).join('')}
+          ${Object.entries(ROLES).map(([k, v]) =>
+            `<option value="${k}" ${a.role === k ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}
         </select>
+        <div class="hlp">Seeds the permissions below. Tune them per account afterwards.</div>
       </div>
       <div class="fld">
-        <label>Site access</label>
-        <select id="ufSite">
-          <option value="all" ${a.site === 'all' ? 'selected' : ''}>All sites</option>
-          ${S.sites.map((s) => `<option value="${s.id}" ${a.site === s.id ? 'selected' : ''}>${esc(s.code)} — ${esc(s.name)}</option>`).join('')}
+        <label>Status</label>
+        <select id="ufActive" ${self ? 'disabled' : ''}>
+          <option value="1" ${a.active === 0 ? '' : 'selected'}>Active</option>
+          <option value="0" ${a.active === 0 ? 'selected' : ''}>Inactive — cannot sign in</option>
         </select>
+        ${self ? '<div class="hlp">You cannot deactivate your own account.</div>' : ''}
       </div>
     </div>
+
+    <div class="fld">
+      <label>Assigned warehouses</label>
+      <div id="siteHost">${sitePickHtml()}</div>
+    </div>
+
+    ${editPerms ? `
+      <div class="fld">
+        <label>Module permissions</label>
+        <div class="permbar">
+          <button type="button" class="btn sm" onclick="permBulk('all')">Enable all</button>
+          <button type="button" class="btn sm" onclick="permBulk('none')">Disable all</button>
+          <button type="button" class="btn sm" onclick="permBulk('role')">Reset to role default</button>
+        </div>
+        <div id="permHost">${permMatrixHtml()}</div>
+        ${self
+          ? '<div class="hlp">Settings stays enabled on your own account, so you cannot lock yourself out.</div>'
+          : ''}
+      </div>
+
+      <div class="fld">
+        <label>Operations</label>
+        <div id="permOps">${permOpsHtml()}</div>
+      </div>`
+      : '<div class="hlp">Your account cannot change permissions.</div>'}
   `, `
     <button class="btn" onclick="closeModal()">Cancel</button>
-    ${u && u !== VIEW.user.u ? `<button class="btn dgr" onclick="doDelUser('${u}')">Delete</button>` : ''}
-    <button class="btn pri" onclick="saveUser('${u || ''}')">Save account</button>
-  `);
+    ${u && !self ? `<button class="btn dgr" onclick="doDelUser('${u}')">Delete</button>` : ''}
+    <button class="btn pri" onclick="saveUser('${u || ''}')">Save permissions</button>
+  `, true);
+}
+
+/**
+ * What changed between two permission sets, so the activity log records the
+ * actual grants and revokes rather than just "permissions updated".
+ */
+function permDiff(before, after) {
+  const on = [];
+  const off = [];
+
+  MODULES.forEach((m) => {
+    m.acts.forEach((a) => {
+      const b = before[m.id] ? before[m.id][a] : 0;
+      const c = after[m.id] ? after[m.id][a] : 0;
+      if (b === c) return;
+      (c ? on : off).push(`${m.t} → ${ACT_LABEL[a] || a}`);
+    });
+  });
+
+  return { on, off };
 }
 
 /**
  * Save the account editor
  */
 function saveUser(u) {
+  if (!canDo('admin', 'accounts')) return toast('Manager access required', 'bad');
+
   const name = $('#ufName').value.trim();
   const user = $('#ufUser').value.trim().toLowerCase();
   const p = $('#ufPass').value;
   const role = $('#ufRole').value;
-  const site = $('#ufSite').value;
+  const active = $('#ufActive') && $('#ufActive').value === '0' ? 0 : 1;
+  const self = !!u && u === VIEW.user.u;
 
   if (!name || !p) return toast('Name and password are required', 'bad');
 
+  const perms = canDo('admin', 'perms') ? JSON.parse(JSON.stringify(PERM_DRAFT)) : null;
+
+  // Never let the signed-in manager revoke their own way back into Settings
+  if (perms && self) {
+    perms.admin.view = 1;
+    perms.admin.accounts = 1;
+    perms.admin.perms = 1;
+  }
+
+  const sites = SITE_DRAFT.slice();
+  const siteLabel = sites.length ? sites.join(', ') : 'all warehouses';
+
   if (u) {
-    Object.assign(S.users.find((x) => x.u === u), { name, p, role, site });
+    const acc = S.users.find((x) => x.u === u);
+    const before = permsFor(acc);
+
+    Object.assign(acc, {
+      name, p, role, active, sites,
+      site: sites.length === 1 ? sites[0] : 'all'
+    });
+    if (perms) acc.perms = perms;
+
+    const d = perms ? permDiff(before, perms) : { on: [], off: [] };
+    logIt('perm',
+      `Updated account ${name} (${u}) — ${siteLabel}` +
+      (d.on.length ? `; enabled ${d.on.join(', ')}` : '') +
+      (d.off.length ? `; disabled ${d.off.join(', ')}` : ''),
+      'all', { target: u });
   } else {
     if (!user) return toast('Username is required', 'bad');
     if (S.users.some((x) => x.u === user)) return toast('That username already exists', 'bad');
-    S.users.push({ u: user, p, name, role, site });
+
+    const acc = {
+      u: user, p, name, role, active, sites,
+      site: sites.length === 1 ? sites[0] : 'all'
+    };
+    if (perms) acc.perms = perms;
+    S.users.push(acc);
+
+    logIt('perm', `Created account ${name} (${user}) as ${ROLES[role].label} — ${siteLabel}`,
+      'all', { target: user });
   }
+
+  // The signed-in account may have just changed its own reach
+  if (self) VIEW.user = S.users.find((x) => x.u === u);
 
   saveState();
   closeModal();
+  buildSites();
+  buildNav();
   render();
   toast('Account saved', 'good');
 }
@@ -417,7 +686,7 @@ function doDelUser(u) {
  * Save the app name and optional logo
  */
 function saveBrand() {
-  const nm = $('#cfgName').value.trim() || 'VoltGrid Store';
+  const nm = $('#cfgName').value.trim() || 'SPARE PARTS MANAGEMENT SYSTEM';
   const f = $('#cfgLogo').files[0];
 
   const done = () => {
@@ -626,7 +895,7 @@ function impJSON(inp) {
       delete d._photos;
 
       S = migrate(d);
-      if (!S.cfg) S.cfg = { appName: 'VoltGrid Store', logo: '', sheetUrl: '', poSeq: 1 };
+      if (!S.cfg) S.cfg = { appName: 'SPARE PARTS MANAGEMENT SYSTEM', logo: 'assets/logo.svg', sheetUrl: '', poSeq: 1 };
 
       saveState();
       brand();
@@ -635,7 +904,7 @@ function impJSON(inp) {
       render();
       toast('Backup restored', 'good');
     } catch (err) {
-      toast('That file is not a VoltGrid backup', 'bad');
+      toast('That file is not an SNT backup', 'bad');
     }
     inp.value = '';
   };

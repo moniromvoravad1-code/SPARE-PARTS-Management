@@ -12,8 +12,8 @@ let S = {
   log: [],
   users: [],
   cfg: {
-    appName: 'VoltGrid Store',
-    logo: '',
+    appName: 'SPARE PARTS MANAGEMENT SYSTEM',
+    logo: 'assets/logo.svg',
     sheetUrl: '',
     autoSync: true,
     poSeq: 15
@@ -31,6 +31,7 @@ let VIEW = {
   tab: 'all',
   catMode: 'value',
   flowMode: 'month',
+  sel: [],
   user: null
 };
 
@@ -44,12 +45,14 @@ async function saveState() {
 async function loadState() {
   const loaded = await dbGet(LS_KEY);
 
-  // Only trust a saved store that still has accounts and stock in it. A blank
-  // or half-written record would otherwise load over the defaults and leave
-  // nobody able to sign in.
+  // Only trust a saved store that still has accounts in it. A blank or
+  // half-written record would otherwise load over the defaults and leave
+  // nobody able to sign in. An empty parts or tools list is a legitimate
+  // state — someone may have deleted the last line — so it must never be
+  // read as "nothing saved yet" and reseeded over.
   const usable = loaded &&
     Array.isArray(loaded.users) && loaded.users.length &&
-    Array.isArray(loaded.parts) && loaded.parts.length;
+    Array.isArray(loaded.parts) && Array.isArray(loaded.tools);
 
   if (usable) {
     S = migrate({ ...S, ...loaded });
@@ -60,7 +63,7 @@ async function loadState() {
   // Fill in anything an older backup predates
   if (!S.log) S.log = [];
   if (!S.pos) S.pos = [];
-  if (!S.cfg) S.cfg = { appName: 'VoltGrid Store', logo: '', sheetUrl: '', autoSync: true, poSeq: 1 };
+  if (!S.cfg) S.cfg = { appName: 'SPARE PARTS MANAGEMENT SYSTEM', logo: 'assets/logo.svg', sheetUrl: '', autoSync: true, poSeq: 1 };
 }
 
 // Add activity log entry
@@ -79,13 +82,15 @@ function logIt(type, txt, site, meta) {
   if (S.log.length > 900) S.log.length = 900;
 }
 
-// Scope utilities
-const inSite = (o) => VIEW.site === 'all' || o.site === VIEW.site;
+// Scope utilities. "All warehouses" means every warehouse THIS account may
+// reach, never the whole store — so an account assigned to one site can never
+// read stock from another by switching the selector back to All.
+const inSite = (o) => (VIEW.site === 'all' ? mySiteIds().includes(o.site) : o.site === VIEW.site);
 
-// Get current user's accessible sites
+// Warehouses the signed-in account may work in
 function mySites() {
-  const lock = VIEW.user.site && VIEW.user.site !== 'all';
-  return S.sites.filter((s) => !lock || s.id === VIEW.user.site);
+  const ids = mySiteIds();
+  return S.sites.filter((s) => ids.includes(s.id));
 }
 
 // Get site by ID

@@ -233,8 +233,8 @@ function seed() {
     log,
     users,
     cfg: {
-      appName: 'VoltGrid Store',
-      logo: '',
+      appName: 'SPARE PARTS MANAGEMENT SYSTEM',
+      logo: 'assets/logo.svg',
       sheetUrl: '',
       autoSync: true,
       poSeq: 15

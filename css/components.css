@@ -1343,3 +1343,181 @@
     display: none;
   }
 }
+
+/* ============ BULK SELECTION ============ */
+.selbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.selbox input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.rows .selbox {
+  padding-top: 3px;
+}
+
+.selbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+
+.selbar span {
+  margin-right: auto;
+}
+
+.selbar b {
+  color: var(--ink);
+}
+
+/* ============ PERMISSION MATRIX ============ */
+.modal.wide {
+  max-width: 880px;
+}
+
+.permtbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.permtbl th {
+  text-align: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--ink3);
+  font-weight: 700;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.permtbl th.mod,
+.permtbl td.mod {
+  text-align: left;
+  padding-left: 2px;
+  white-space: nowrap;
+}
+
+.permtbl td {
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+
+.permtbl tr:last-child td {
+  border-bottom: 0;
+}
+
+.permtbl tbody tr:hover {
+  background: var(--surface2);
+}
+
+.permtbl td.mod b {
+  font-weight: 600;
+}
+
+.permtbl .na {
+  color: var(--line2);
+}
+
+.permtbl input[type=checkbox] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.permtbl tr.off td.mod b {
+  color: var(--ink3);
+}
+
+.permbar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.permops {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px 14px;
+}
+
+.permops label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  cursor: pointer;
+  margin: 0;
+  padding: 3px 0;
+}
+
+.permops input[type=checkbox] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.permops .grp {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--ink3);
+  margin-top: 6px;
+}
+
+.sitepick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 5px 14px;
+}
+
+.sitepick label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.sitepick input[type=checkbox] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .permtbl {
+    font-size: 11.5px;
+  }
+  .permtbl th,
+  .permtbl td {
+    padding: 6px 2px;
+  }
+}

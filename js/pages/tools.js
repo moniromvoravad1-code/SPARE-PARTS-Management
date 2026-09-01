@@ -59,7 +59,7 @@ function filterTools() {
  */
 function toolsList() {
   const L = filterTools();
-  if (!L.length) return empty('⚒', 'No tools match', 'Try another tab or clear the search.');
+  if (!L.length) return selBar('delSelTools()') + empty('⚒', 'No tools match', 'Try another tab or clear the search.');
 
   const act = (t) => `<button class="btn sm" data-menu onclick="toolMenu(event,'${t.id}')">Actions ▾</button>`;
 
@@ -71,9 +71,11 @@ function toolsList() {
   };
 
   return `
+    ${selBar('delSelTools()')}
     <table class="tbl">
       <thead>
         <tr>
+          ${can('del') ? `<th style="width:34px">${selAllBox()}</th>` : ''}
           <th style="width:52px"></th><th>Tool</th><th>Category</th><th>Site</th><th>Held by</th>
           <th>Due back</th><th>Calibration</th><th>Status</th><th></th>
         </tr>
@@ -81,6 +83,7 @@ function toolsList() {
       <tbody>
         ${L.map((t) => `
           <tr>
+            ${can('del') ? `<td>${selBox(t.id)}</td>` : ''}
             <td>${thumb(t, t.code.replace('TL-', ''))}</td>
             <td>
               <div class="pname">${esc(t.name)}</div>
@@ -104,6 +107,7 @@ function toolsList() {
     <div class="rows">
       ${L.map((t) => `
         <div class="row">
+          ${selBox(t.id)}
           ${thumb(t, t.code.replace('TL-', ''))}
           <div class="row-m">
             <div style="display:flex;gap:8px;align-items:flex-start">
@@ -310,22 +314,74 @@ function delTool(id) {
 }
 
 /**
+ * Strip one tool out of the register along with its device photo. Logs the
+ * removal; the caller saves and repaints.
+ */
+function removeTool(t) {
+  if (t.photo && !/^https?:/i.test(t.photo)) delete PH[t.photo];
+
+  S.tools = S.tools.filter((x) => x.id !== t.id);
+  VIEW.sel = VIEW.sel.filter((x) => x !== t.id);
+
+  logIt('del', `Deleted tool ${t.name} (${t.code})`, t.site);
+}
+
+/**
  * Delete a tool and its device photo
  */
 function doDelTool(id) {
-  const t = toolById(id);
+  removeTool(toolById(id));
 
-  if (t.photo && !/^https?:/i.test(t.photo)) delete PH[t.photo];
-  S.tools = S.tools.filter((x) => x.id !== id);
   savePhotos();
-
-  logIt('del', `Deleted tool ${t.name} (${t.code})`, t.site);
-
   saveState();
   closeModal();
   buildNav();
   render();
   toast('Tool deleted', 'good');
+}
+
+/**
+ * Confirm deletion of everything ticked in the list
+ */
+function delSelTools() {
+  if (!can('del')) return toast('Only a manager can delete tools', 'bad');
+
+  const L = VIEW.sel.map(toolById).filter(Boolean);
+  if (!L.length) return toast('Nothing is selected', 'bad');
+
+  const out = L.filter((t) => t.status === 'out');
+
+  openModal('Delete selected tools', `${L.length} tool${L.length > 1 ? 's' : ''}`, `
+    <p style="font-size:13.5px;margin:0 0 10px">
+      These tools leave the register and their calibration records go with them.
+    </p>
+    ${out.length
+      ? `<p style="font-size:12.5px;color:var(--out);margin:0 0 10px">
+          ${out.length} of them ${out.length > 1 ? 'are' : 'is'} still checked out.
+        </p>`
+      : ''}
+    ${L.map((t) => `
+      <div class="kv"><span>${esc(t.name)}</span><b class="mono">${esc(t.code)}</b></div>
+    `).join('')}
+  `, `
+    <button class="btn" onclick="closeModal()">Keep them</button>
+    <button class="btn dgr" onclick="doDelSelTools()">Delete ${L.length} tool${L.length > 1 ? 's' : ''}</button>
+  `);
+}
+
+/**
+ * Delete every ticked tool
+ */
+function doDelSelTools() {
+  const L = VIEW.sel.map(toolById).filter(Boolean);
+  L.forEach(removeTool);
+
+  savePhotos();
+  saveState();
+  closeModal();
+  buildNav();
+  render();
+  toast(`Deleted ${L.length} tool${L.length > 1 ? 's' : ''}`, 'good');
 }
 
 /* ---------- tool movements ---------- */

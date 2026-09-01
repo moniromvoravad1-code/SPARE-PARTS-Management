@@ -7,6 +7,7 @@
  */
 function closeModal() {
   $('#mask').classList.remove('on');
+  $('#modal').classList.remove('wide');
   $('#modal').innerHTML = '';
 }
 
@@ -17,7 +18,7 @@ function closeModal() {
  * @param {string} body - Modal body HTML
  * @param {string} footer - Footer with buttons HTML
  */
-function openModal(title, sub, body, footer) {
+function openModal(title, sub, body, footer, wide) {
   const modalHtml = `
     <div class="m-h">
       <div>
@@ -30,6 +31,7 @@ function openModal(title, sub, body, footer) {
     ${footer ? `<div class="m-f">${footer}</div>` : ''}
   `;
   $('#modal').innerHTML = modalHtml;
+  $('#modal').classList.toggle('wide', !!wide);
   $('#mask').classList.add('on');
   
   // Auto-focus first input (desktop only)

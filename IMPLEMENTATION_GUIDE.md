@@ -1,4 +1,4 @@
-# VoltGrid Store - Modular Architecture Implementation Guide
+# SPARE PARTS MANAGEMENT SYSTEM - Modular Architecture Implementation Guide
 
 ## ✅ Restructuring Complete
 

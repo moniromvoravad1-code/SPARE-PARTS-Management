@@ -56,14 +56,16 @@ function filterParts() {
  */
 function partsList() {
   const L = filterParts();
-  if (!L.length) return empty('▤', 'No parts match', 'Try clearing the search or filters.');
+  if (!L.length) return selBar('delSelParts()') + empty('▤', 'No parts match', 'Try clearing the search or filters.');
 
   const act = (p) => `<button class="btn sm" data-menu onclick="partMenu(event,'${p.id}')">Actions ▾</button>`;
 
   return `
+    ${selBar('delSelParts()')}
     <table class="tbl">
       <thead>
         <tr>
+          ${can('del') ? `<th style="width:34px">${selAllBox()}</th>` : ''}
           <th style="width:52px"></th><th>Part</th><th>Category</th><th>Bin</th><th>Site</th>
           <th style="width:150px">Level</th><th class="num">On hand</th><th class="num">Value</th>
           <th>Status</th><th>Warranty</th><th></th>
@@ -72,6 +74,7 @@ function partsList() {
       <tbody>
         ${L.map((p) => `
           <tr>
+            ${can('del') ? `<td>${selBox(p.id)}</td>` : ''}
             <td>${thumb(p, p.cat)}</td>
             <td>
               <div class="pname">${esc(p.name)}</div>
@@ -103,6 +106,7 @@ function partsList() {
     <div class="rows">
       ${L.map((p) => `
         <div class="row">
+          ${selBox(p.id)}
           ${thumb(p, p.cat)}
           <div class="row-m">
             <div style="display:flex;gap:8px;align-items:flex-start">
@@ -547,23 +551,68 @@ function delPart(id) {
 }
 
 /**
+ * Strip one part out of the store: its device photo, its stock line and any
+ * order lines pointing at it. Logs the removal; the caller saves and repaints.
+ */
+function removePart(p) {
+  if (p.photo && !/^https?:/i.test(p.photo)) delete PH[p.photo];
+
+  S.parts = S.parts.filter((x) => x.id !== p.id);
+  S.pos.forEach((o) => {
+    o.lines = o.lines.filter((l) => l.part !== p.id);
+  });
+  VIEW.sel = VIEW.sel.filter((x) => x !== p.id);
+
+  logIt('del', `Deleted part ${p.name} (${p.sku})`, p.site);
+}
+
+/**
  * Delete a part, its device photo and any order lines pointing at it
  */
 function doDelPart(id) {
-  const p = partById(id);
-
-  if (p.photo && !/^https?:/i.test(p.photo)) delete PH[p.photo];
-  S.parts = S.parts.filter((x) => x.id !== id);
-  S.pos.forEach((o) => {
-    o.lines = o.lines.filter((l) => l.part !== id);
-  });
+  removePart(partById(id));
 
   savePhotos();
-  logIt('del', `Deleted part ${p.name} (${p.sku})`, p.site);
-
   saveState();
   closeModal();
   buildNav();
   render();
   toast('Part deleted', 'good');
+}
+
+/**
+ * Confirm deletion of everything ticked in the list
+ */
+function delSelParts() {
+  if (!can('del')) return toast('Only a manager can delete parts', 'bad');
+
+  const L = VIEW.sel.map(partById).filter(Boolean);
+  if (!L.length) return toast('Nothing is selected', 'bad');
+
+  openModal('Delete selected parts', `${L.length} stock line${L.length > 1 ? 's' : ''}`, `
+    <p style="font-size:13.5px;margin:0 0 10px">
+      These parts leave the store and any draft orders. The activity log keeps the history.
+    </p>
+    ${L.map((p) => `
+      <div class="kv"><span>${esc(p.name)}</span><b class="mono">${esc(p.sku)}</b></div>
+    `).join('')}
+  `, `
+    <button class="btn" onclick="closeModal()">Keep them</button>
+    <button class="btn dgr" onclick="doDelSelParts()">Delete ${L.length} part${L.length > 1 ? 's' : ''}</button>
+  `);
+}
+
+/**
+ * Delete every ticked part
+ */
+function doDelSelParts() {
+  const L = VIEW.sel.map(partById).filter(Boolean);
+  L.forEach(removePart);
+
+  savePhotos();
+  saveState();
+  closeModal();
+  buildNav();
+  render();
+  toast(`Deleted ${L.length} part${L.length > 1 ? 's' : ''}`, 'good');
 }

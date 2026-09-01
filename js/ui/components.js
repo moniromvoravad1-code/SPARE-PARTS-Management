@@ -162,3 +162,84 @@ function pickOne(b) {
   b.parentNode.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
   b.classList.add('on');
 }
+
+/* ---------- bulk selection ---------- */
+
+/**
+ * Ids of the rows currently listed, in the order they appear on screen
+ */
+function listedIds() {
+  if (VIEW.page === 'parts') return filterParts().map((p) => p.id);
+  if (VIEW.page === 'tools') return filterTools().map((t) => t.id);
+  return [];
+}
+
+/**
+ * Selection tick box for one row. Only roles that can delete ever see it.
+ */
+function selBox(id) {
+  if (!can('del')) return '';
+  return `
+    <label class="selbox">
+      <input type="checkbox" onchange="toggleSel('${id}',this.checked)" ${VIEW.sel.includes(id) ? 'checked' : ''}>
+    </label>
+  `;
+}
+
+/**
+ * Header tick box - selects or clears every row currently listed
+ */
+function selAllBox() {
+  if (!can('del')) return '';
+  const ids = listedIds();
+  const on = ids.length && ids.every((id) => VIEW.sel.includes(id));
+
+  return `
+    <label class="selbox">
+      <input type="checkbox" onchange="toggleSelAll(this.checked)" ${on ? 'checked' : ''}>
+    </label>
+  `;
+}
+
+/**
+ * Add or remove one row from the selection
+ */
+function toggleSel(id, on) {
+  VIEW.sel = on ? [...new Set([...VIEW.sel, id])] : VIEW.sel.filter((x) => x !== id);
+  repaint();
+}
+
+/**
+ * Tick or clear every row currently listed, leaving filtered-out rows alone
+ */
+function toggleSelAll(on) {
+  const ids = listedIds();
+  VIEW.sel = on
+    ? [...new Set([...VIEW.sel, ...ids])]
+    : VIEW.sel.filter((x) => !ids.includes(x));
+  repaint();
+}
+
+/**
+ * Drop the selection and repaint
+ */
+function clearSel() {
+  VIEW.sel = [];
+  repaint();
+}
+
+/**
+ * Strip above a list showing what is ticked, with the bulk delete action
+ * @param {string} action - JS call that opens the delete confirmation
+ */
+function selBar(action) {
+  if (!can('del') || !VIEW.sel.length) return '';
+
+  return `
+    <div class="selbar">
+      <span><b>${VIEW.sel.length}</b> selected</span>
+      <button class="btn sm" onclick="clearSel()">Clear</button>
+      <button class="btn sm dgr" onclick="${action}">✕ Delete selected</button>
+    </div>
+  `;
+}

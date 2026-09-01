@@ -37,17 +37,15 @@ const NAV = [
 ];
 
 /**
- * Starter accounts, one per role, created the first time the app runs.
+ * The single account the app ships with, used to sign in the first time.
  *
- * These are placeholders for evaluating the app — never real staff credentials.
- * Set your team up in Settings → Accounts after signing in as the manager, and
- * change these passwords (or delete these accounts) before anyone relies on them.
+ * This password is readable by anyone who views the page source, so treat it as
+ * a setup key rather than a secret: sign in, change it under your own account,
+ * then create the real staff accounts in Settings -> Accounts, where each one
+ * gets its own password, warehouses and module permissions.
  */
 const DEMO_USERS = [
-  { u: 'manager', p: 'manager123', name: 'Store Manager', position: 'Manager', idCard: '0001', role: 'manager', site: 'all' },
-  { u: 'storekeeper', p: 'store123', name: 'Store Keeper', position: 'Storekeeper', idCard: '0002', role: 'storekeeper', site: 'all' },
-  { u: 'tech', p: 'tech123', name: 'Site Technician', position: 'Engineer', idCard: '0003', role: 'tech', site: 'all' },
-  { u: 'guest', p: 'guest123', name: 'Read Only', position: 'Visitor', idCard: '0004', role: 'guest', site: 'all' }
+  { u: 'manager', p: 'Snt1X6ePdYH6', name: 'Store Manager', position: 'Manager', idCard: '0001', role: 'manager', site: 'all' }
 ];
 
 // Site code remapping for data migration

@@ -11,6 +11,7 @@ function go(p) {
   VIEW.cat = 'all';
   VIEW.stock = 'all';
   VIEW.tab = 'all';
+  VIEW.sel = [];
   
   $('#rail').classList.remove('on');
   $('#scrim').classList.remove('on');
@@ -31,6 +32,7 @@ function goLog(type) {
   VIEW.cat = 'all';
   VIEW.stock = 'all';
   VIEW.tab = type || 'all';
+  VIEW.sel = [];
   
   $('#rail').classList.remove('on');
   $('#scrim').classList.remove('on');
@@ -45,7 +47,7 @@ function goLog(type) {
  * Build and render navigation
  */
 function buildNav() {
-  const pages = ROLES[VIEW.user.role].pages;
+  const pages = visiblePages();
   const b = {
     parts: lowParts().length,
     tools: overTools().length,
@@ -55,8 +57,15 @@ function buildNav() {
       .filter((o) => o.status === 'draft').length
   };
   
-  $('#nav').innerHTML = NAV.map((n) => {
-    if (n.g) return NAV.filter((x) => x.id && pages.includes(x.id)).length ? `<div class="nav-lbl">${n.g}</div>` : '';
+  $('#nav').innerHTML = NAV.map((n, i) => {
+    // A group heading belongs to the entries that follow it, up to the next
+    // heading. Show it only when this role can actually see one of them,
+    // otherwise a restricted account gets a bare label with nothing beneath.
+    if (n.g) {
+      const mine = [];
+      for (let j = i + 1; j < NAV.length && !NAV[j].g; j++) mine.push(NAV[j]);
+      return mine.some((x) => pages.includes(x.id)) ? `<div class="nav-lbl">${n.g}</div>` : '';
+    }
     if (!pages.includes(n.id)) return '';
     
     const c = b[n.id] || 0;
@@ -181,7 +190,10 @@ function siteSheet() {
  * Set active site
  */
 function setSite(id) {
+  if (!siteAllowed(id)) return toast('That warehouse is not assigned to your account', 'bad');
+
   VIEW.site = id;
+  VIEW.sel = [];
   closeModal();
   buildSites();
   buildNav();
@@ -271,7 +283,7 @@ $('#meBtn').onclick = (e) => {
       <div class="mh">${esc(u.name)} · ${ROLES[u.role].label}</div>
       ${canSee('log') ? '<button onclick="closeMenu();go(\'log\')">≡ Activity log</button>' : ''}
       <button onclick="closeMenu();showSessionInfo()">📊 Session info</button>
-      ${ROLES[u.role].pages.includes('admin') ? '<button onclick="closeMenu();go(\'admin\')">⚙ Settings</button>' : ''}
+      ${canSee('admin') ? '<button onclick="closeMenu();go(\'admin\')">⚙ Settings</button>' : ''}
       <button onclick="closeMenu();pwModal()">⚿ Change password</button>
       <div class="div"></div>
       <button class="dgr" onclick="signOut()">⏻ Sign out</button>
