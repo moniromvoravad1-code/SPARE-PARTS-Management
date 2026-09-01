@@ -141,6 +141,9 @@ function renderAdmin() {
               <div class="card-s">${S.users.length} users · permissions are set per account</div>
             </div>
             <div class="r" style="display:flex;gap:8px">
+              ${S.users.some(pwIsLegacy)
+                ? '<button class="btn sm" onclick="securePasswords()">Secure passwords</button>'
+                : ''}
               <label class="btn sm" style="cursor:pointer">Import list
                 <input type="file" accept="application/json" style="display:none" onchange="impUsers(this)">
               </label>
@@ -154,8 +157,11 @@ function renderAdmin() {
                 <div style="min-width:0">
                   <div class="al-t">${esc(u.name)}</div>
                   <div class="al-s mono">
-                    ${esc(u.u)} · ${canDo('admin', 'accounts') ? esc(u.p) : '••••••••'} · ${esc(siteSummary(u))}
+                    ${esc(u.u)} · ${esc(siteSummary(u))}
                   </div>
+                  ${pwIsLegacy(u)
+                    ? '<div class="al-s" style="color:var(--low)">Password not secured yet</div>'
+                    : ''}
                   <div class="al-s">${esc(permSummary(u))}</div>
                 </div>
                 <div class="al-r">
@@ -476,7 +482,12 @@ function userModal(u) {
         <label>Username</label>
         <input id="ufUser" class="mono" value="${esc(a.u)}" ${u ? 'disabled' : ''} autocapitalize="none">
       </div>
-      <div class="fld"><label>Password</label><input id="ufPass" class="mono" value="${esc(a.p)}"></div>
+      <div class="fld">
+        <label>${u ? 'New password' : 'Password'}</label>
+        <input id="ufPass" type="password" class="mono" value="" autocomplete="new-password"
+          placeholder="${u ? 'Leave blank to keep the current one' : 'At least 6 characters'}">
+        ${u ? '<div class="hlp">Stored scrambled — the current one cannot be shown.</div>' : ''}
+      </div>
     </div>
     <div class="f2">
       <div class="fld">
@@ -549,9 +560,33 @@ function permDiff(before, after) {
 }
 
 /**
+ * Scramble any password still held in readable form.
+ *
+ * Signing in upgrades an account on its own, but an account whose owner has not
+ * signed in since the upgrade would otherwise keep a readable password — and
+ * once accounts are shared, that would travel. This lets the manager deal with
+ * all of them at once, on their own device, at a moment of their choosing.
+ */
+async function securePasswords() {
+  if (!canDo('admin', 'accounts')) return toast('Manager access required', 'bad');
+
+  const stale = S.users.filter(pwIsLegacy);
+  if (!stale.length) return toast('Every password is already secured', 'good');
+
+  toast(`Securing ${stale.length} password${stale.length === 1 ? '' : 's'}…`);
+
+  for (const u of stale) await pwSet(u, String(u.p));
+
+  logIt('perm', `Secured ${stale.length} stored password${stale.length === 1 ? '' : 's'}`, 'all');
+  await saveState();
+  render();
+  toast(`${stale.length} password${stale.length === 1 ? '' : 's'} secured`, 'good');
+}
+
+/**
  * Save the account editor
  */
-function saveUser(u) {
+async function saveUser(u) {
   if (!canDo('admin', 'accounts')) return toast('Manager access required', 'bad');
 
   const name = $('#ufName').value.trim();
@@ -561,7 +596,15 @@ function saveUser(u) {
   const active = $('#ufActive') && $('#ufActive').value === '0' ? 0 : 1;
   const self = !!u && u === VIEW.user.u;
 
-  if (!name || !p) return toast('Name and password are required', 'bad');
+  if (!name) return toast('Name is required', 'bad');
+
+  // Editing keeps the existing password when the field is left blank; only a
+  // new account has to be given one.
+  if (!u && !p) return toast('A password is required for a new account', 'bad');
+  if (p) {
+    const v = validatePassword(p);
+    if (!v.valid) return toast(v.msg, 'bad');
+  }
 
   const perms = canDo('admin', 'perms') ? JSON.parse(JSON.stringify(PERM_DRAFT)) : null;
 
@@ -580,9 +623,11 @@ function saveUser(u) {
     const before = permsFor(acc);
 
     Object.assign(acc, {
-      name, p, role, active, sites,
-      site: sites.length === 1 ? sites[0] : 'all'
+      name, role, active, sites,
+      site: sites.length === 1 ? sites[0] : 'all',
+      updated: Date.now()
     });
+    if (p) await pwSet(acc, p);
     if (perms) acc.perms = perms;
 
     const d = perms ? permDiff(before, perms) : { on: [], off: [] };
@@ -596,8 +641,10 @@ function saveUser(u) {
     if (S.users.some((x) => x.u === user)) return toast('That username already exists', 'bad');
 
     const acc = {
-      u: user, p, name, role, active, sites,
-      site: sites.length === 1 ? sites[0] : 'all'
+      u: user, name, role, active, sites,
+      site: sites.length === 1 ? sites[0] : 'all',
+      updated: Date.now(),
+      ...(await pwHash(p))
     };
     if (perms) acc.perms = perms;
     S.users.push(acc);
@@ -633,7 +680,7 @@ function impUsers(inp) {
 
   const r = new FileReader();
 
-  r.onload = (e) => {
+  r.onload = async (e) => {
     inp.value = '';
 
     let list;
@@ -649,25 +696,36 @@ function impUsers(inp) {
     const skipped = [];
     const rejected = [];
 
-    list.forEach((a) => {
-      const u = String(a.u || '').trim().toLowerCase();
+    if (list.length > 3) toast('Securing passwords…');
 
-      if (!u || !a.p || !a.name) return rejected.push(u || '(no username)');
-      if (!ROLES[a.role]) return rejected.push(u + ' (unknown role)');
-      if (String(a.p).length < 6) return rejected.push(u + ' (password too short)');
-      if (S.users.some((x) => x.u === u)) return skipped.push(u);
+    for (const a of list) {
+      const u = String(a.u || '').trim().toLowerCase();
+      const hashed = a.hash && a.salt;
+
+      if (!u || !a.name || (!hashed && !a.p)) { rejected.push(u || '(no username)'); continue; }
+      if (!ROLES[a.role]) { rejected.push(u + ' (unknown role)'); continue; }
+      if (!hashed && String(a.p).length < 6) { rejected.push(u + ' (password too short)'); continue; }
+      if (S.users.some((x) => x.u === u)) { skipped.push(u); continue; }
+
+      // An already-hashed record is carried across verbatim, so a team can be
+      // moved between deployments without anyone's password being known.
+      const cred = hashed
+        ? { pwAlg: a.pwAlg || PW_ALG, pwIter: Number(a.pwIter) || PW_ITER, salt: String(a.salt), hash: String(a.hash) }
+        : await pwHash(String(a.p));
 
       S.users.push({
         u,
-        p: String(a.p),
         name: String(a.name),
         position: a.position ? String(a.position) : '',
         idCard: a.idCard ? String(a.idCard) : '',
         role: a.role,
-        site: a.site && a.site !== 'all' && S.sites.some((s) => s.id === a.site) ? a.site : 'all'
+        site: a.site && a.site !== 'all' && S.sites.some((s) => s.id === a.site) ? a.site : 'all',
+        active: a.active === 0 ? 0 : 1,
+        updated: Date.now(),
+        ...cred
       });
       added.push(u);
-    });
+    }
 
     if (!added.length && !skipped.length) {
       return toast('Nothing in that file could be imported', 'bad');
@@ -675,7 +733,7 @@ function impUsers(inp) {
 
     if (added.length) {
       logIt('add', `Imported ${added.length} account${added.length === 1 ? '' : 's'}: ${added.join(', ')}`, 'all');
-      saveState();
+      await saveState();
     }
 
     render();
@@ -866,9 +924,18 @@ async function expJSON() {
   // A full backup carries the activity log with it, so it follows the same rule
   if (!can('export')) return toast('Manager access required', 'bad');
 
+  // A backup keeps salts and hashes so it can restore sign-in, but never a
+  // readable password — a backup may be taken part-way through the upgrade.
+  const users = S.users.map((u) => {
+    const c = { ...u };
+    delete c.p;
+    if (!c.hash) c.needsPassword = 1;
+    return c;
+  });
+
   const ok = await dl(
     `voltgrid-store-${iso(today())}.json`,
-    JSON.stringify(Object.assign({}, S, { _photos: PH }), null, 2)
+    JSON.stringify(Object.assign({}, S, { users, _photos: PH }), null, 2)
   );
   if (ok) toast('Backup downloaded', 'good');
 }
@@ -917,6 +984,12 @@ function impJSON(inp) {
 
       S = migrate(d);
       if (!S.cfg) S.cfg = { appName: 'SPARE PARTS MANAGEMENT SYSTEM', logo: 'assets/logo.svg', sheetUrl: '', poSeq: 1 };
+
+      // This path bypasses loadState, so the way-back-in repair has to run here
+      // too — a backup full of accounts with no credential would be a brick.
+      if (ensureSignInPossible()) {
+        toast('That backup had no account that could sign in — the setup account was restored', 'bad');
+      }
 
       // A backup larger than this device can hold must not report success
       const okState = await saveState();

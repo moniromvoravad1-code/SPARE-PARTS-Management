@@ -2404,6 +2404,248 @@ const CONSUMPTION_RATES = {
   Mechanical: 2
 };
 
+/* ===== js/crypto.js ===== */
+/**
+ * js/crypto.js - Password hashing
+ *
+ * Accounts are shared through the Google Sheet, so a password must never leave
+ * the device in a form anyone can read. Records carry PBKDF2-SHA-256 with a
+ * per-account random salt.
+ *
+ * Be clear about what this buys: it protects against READING, not against
+ * attacking. It keeps passwords off the screen, out of the backup file and out
+ * of the sheet. Anyone who obtains the sheet still has salt and hash and can
+ * grind offline as fast as their hardware allows - there is no server here to
+ * withhold a secret or impose a rate limit. PBKDF2 makes each guess expensive;
+ * it cannot rescue a weak password.
+ *
+ * Values are hex, never base64: a Google Sheets cell whose text starts with
+ * + - = or @ is parsed as a formula, and hex can only ever start [0-9a-f].
+ */
+
+const PW_ALG = 'pbkdf2-sha256';
+const PW_ITER = 150000;         // WebCrypto: ~90ms
+const PW_ITER_JS = 20000;       // bundled fallback: ~1s on a slow phone
+
+/** Which engine this device ended up with. Set by initPwEngine(). */
+let PW_ENGINE = 'subtle';
+
+/**
+ * Pick the hashing engine with a real round trip, not a typeof check - a stub
+ * can exist and still throw. WebCrypto needs a secure context, which covers
+ * https and file:// but NOT a plain http:// LAN address, and this app travels.
+ */
+async function initPwEngine() {
+  try {
+    const d = await crypto.subtle.digest('SHA-256', new Uint8Array([1]));
+    PW_ENGINE = d && d.byteLength === 32 ? 'subtle' : 'js';
+  } catch (e) {
+    PW_ENGINE = 'js';
+  }
+
+  if (PW_ENGINE === 'js') console.warn('WebCrypto unavailable — using the bundled hash');
+  return PW_ENGINE;
+}
+
+const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+function unhex(s) {
+  const a = new Uint8Array(s.length / 2);
+  for (let i = 0; i < a.length; i++) a[i] = parseInt(s.substr(i * 2, 2), 16);
+  return a;
+}
+
+/**
+ * 16 random bytes. Deliberately not uid() - that is Math.random, which is not
+ * a source anyone should build a salt from.
+ */
+function newSalt() {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return hex(a);
+}
+
+/* ---------- bundled SHA-256, for when WebCrypto is not available ---------- */
+
+const K256 = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+];
+
+function sha256(bytes) {
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+
+  const len = bytes.length;
+  const withPad = new Uint8Array((((len + 9) >> 6) + 1) << 6);
+  withPad.set(bytes);
+  withPad[len] = 0x80;
+
+  const bits = len * 8;
+  const dv = new DataView(withPad.buffer);
+  dv.setUint32(withPad.length - 4, bits >>> 0, false);
+  dv.setUint32(withPad.length - 8, Math.floor(bits / 4294967296), false);
+
+  const w = new Uint32Array(64);
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+
+  for (let off = 0; off < withPad.length; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4, false);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+
+    let [a, b, c, d, e, f, g, h] = H;
+
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K256[i] + w[i]) >>> 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) >>> 0;
+
+      h = g; g = f; f = e;
+      e = (d + t1) >>> 0;
+      d = c; c = b; b = a;
+      a = (t1 + t2) >>> 0;
+    }
+
+    H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+    H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+  }
+
+  const out = new Uint8Array(32);
+  const odv = new DataView(out.buffer);
+  H.forEach((v, i) => odv.setUint32(i * 4, v, false));
+  return out;
+}
+
+function hmacSha256(key, msg) {
+  let k = key.length > 64 ? sha256(key) : key;
+
+  const pad = new Uint8Array(64);
+  pad.set(k);
+
+  const inner = new Uint8Array(64 + msg.length);
+  const outer = new Uint8Array(64 + 32);
+
+  for (let i = 0; i < 64; i++) {
+    inner[i] = pad[i] ^ 0x36;
+    outer[i] = pad[i] ^ 0x5c;
+  }
+  inner.set(msg, 64);
+  outer.set(sha256(inner), 64);
+
+  return sha256(outer);
+}
+
+function pbkdf2Js(pw, salt, iter, dkLen) {
+  const out = new Uint8Array(dkLen);
+  const blocks = Math.ceil(dkLen / 32);
+
+  for (let b = 1; b <= blocks; b++) {
+    const first = new Uint8Array(salt.length + 4);
+    first.set(salt);
+    new DataView(first.buffer).setUint32(salt.length, b, false);
+
+    let u = hmacSha256(pw, first);
+    const acc = u.slice();
+
+    for (let i = 1; i < iter; i++) {
+      u = hmacSha256(pw, u);
+      for (let j = 0; j < 32; j++) acc[j] ^= u[j];
+    }
+
+    out.set(acc.subarray(0, Math.min(32, dkLen - (b - 1) * 32)), (b - 1) * 32);
+  }
+
+  return out;
+}
+
+/* ---------- the API the rest of the app uses ---------- */
+
+/**
+ * Derive a key. `iter` comes from the record being verified, not from a
+ * constant, so a record hashed on one engine still verifies on the other.
+ */
+async function pwDerive(password, saltHex, iter) {
+  const salt = unhex(saltHex);
+  const pw = new TextEncoder().encode(password);
+
+  if (PW_ENGINE === 'subtle') {
+    const k = await crypto.subtle.importKey('raw', pw, 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, k, 256);
+    return hex(new Uint8Array(bits));
+  }
+
+  return hex(pbkdf2Js(pw, salt, iter, 32));
+}
+
+/** The credential fields for a new password. */
+async function pwHash(password) {
+  const salt = newSalt();
+  const pwIter = PW_ENGINE === 'subtle' ? PW_ITER : PW_ITER_JS;
+
+  return { pwAlg: PW_ALG, pwIter, salt, hash: await pwDerive(password, salt, pwIter) };
+}
+
+/**
+ * Compare without an early exit on the first differing character. Real
+ * constant time is not achievable in JS, but leaking the length of the common
+ * prefix is free to avoid.
+ */
+function pwEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+/** Set an account's password, dropping any cleartext it still carried. */
+async function pwSet(acc, password) {
+  Object.assign(acc, await pwHash(password), { updated: Date.now() });
+  delete acc.p;
+  return acc;
+}
+
+/**
+ * Check a password, upgrading a legacy cleartext record on the first correct
+ * sign-in. Hashing every account at load would block startup for a second per
+ * account on the fallback engine; doing it here spends that time at the one
+ * moment the person is already waiting.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function pwVerify(acc, password) {
+  if (!acc) return false;
+
+  if (!acc.hash && acc.p !== undefined) {
+    if (String(acc.p) !== password) return false;
+    await pwSet(acc, password);
+    return true;
+  }
+
+  if (!acc.hash || !acc.salt) return false;
+
+  return pwEq(await pwDerive(password, acc.salt, Number(acc.pwIter) || PW_ITER), acc.hash);
+}
+
+/** Does this account still hold a readable password? */
+const pwIsLegacy = (u) => !u.hash && u.p !== undefined;
+
+/** A fixed salt for the timing equaliser on an unknown username. */
+const PW_DUMMY_SALT = '00000000000000000000000000000000';
+
 /* ===== js/utils/dom.js ===== */
 /**
  * js/utils/dom.js - DOM query and manipulation helpers
@@ -2958,6 +3200,43 @@ async function saveState() {
   return r.ok;
 }
 
+/**
+ * Guarantee somebody can still get into Settings.
+ *
+ * If the last manager was deleted, deactivated, or left without any usable
+ * credential, restore the shipped account — otherwise the store is stuck at the
+ * lock screen for good, because the only reset lives behind a sign-in. An
+ * existing manager who can still sign in is never touched.
+ *
+ * Called from loadState, from the backup restore (which bypasses loadState),
+ * and after a pull adopts a remote account list.
+ *
+ * @returns {boolean} whether the shipped account had to be put back
+ */
+function ensureSignInPossible() {
+  const admins = S.users.filter((u) => {
+    const p = permsFor(u);
+    // A record with neither a hash nor a readable password cannot sign in, so
+    // it does not count as a way back in however many permissions it has.
+    return u.active !== 0 && p.admin && p.admin.accounts && (u.hash || u.p !== undefined);
+  });
+
+  if (admins.length) return false;
+
+  DEMO_USERS.forEach((d) => {
+    const found = S.users.find((u) => u.u === d.u);
+    if (found) {
+      Object.assign(found, { active: 1, role: d.role, perms: null, p: d.p, updated: Date.now() });
+      delete found.hash;
+      delete found.salt;
+    } else {
+      S.users.push({ ...d, updated: Date.now() });
+    }
+  });
+
+  return true;
+}
+
 // Load state from storage
 async function loadState() {
   const loaded = await dbGet(LS_KEY, storeLooksUsable);
@@ -2968,22 +3247,7 @@ async function loadState() {
     S = seed();
   }
 
-  // If nothing in the saved store can still reach Settings -- the last manager
-  // was deleted or deactivated -- restore the shipped account. Without this the
-  // store is stuck at the lock screen for good, since the only reset lives
-  // behind a sign-in. An existing manager is never touched.
-  const admins = S.users.filter((u) => {
-    const p = permsFor(u);
-    return u.active !== 0 && p.admin && p.admin.accounts;
-  });
-
-  if (!admins.length) {
-    DEMO_USERS.forEach((d) => {
-      const found = S.users.find((u) => u.u === d.u);
-      if (found) Object.assign(found, { active: 1, role: d.role, perms: null });
-      else S.users.push({ ...d });
-    });
-  }
+  ensureSignInPossible();
 
   // Fill in anything an older backup predates
   if (!S.log) S.log = [];
@@ -5147,7 +5411,7 @@ function resetLoginAttempts() {
 /**
  * Attempt login with username and password
  */
-function doLogin() {
+async function doLogin() {
   // Check if account is locked
   const lockCheck = isAccountLocked();
   if (lockCheck.locked) {
@@ -5173,32 +5437,40 @@ function doLogin() {
     return;
   }
   
-  // Find matching user
-  const acc = S.users.find((x) => x.u === u && x.p === p);
+  const acc = S.users.find((x) => x.u === u);
 
-  // A deactivated account is refused even with the right password
-  if (acc && acc.active === 0) {
-    showLoginError('This account has been deactivated. Ask a manager to re-enable it.');
-    logIt('login_failed', `Sign-in refused, account deactivated: ${u}`, 'all', { user: u });
-    $('#lkPass').value = '';
-    return;
-  }
-  
-  if (!acc) {
+  // An unknown username must cost the same as a wrong password, or the delay
+  // tells an attacker which usernames exist.
+  if (!acc) await pwDerive(p, PW_DUMMY_SALT, PW_ITER);
+
+  // pwVerify upgrades a record that still holds a readable password, but only
+  // when the password given is the right one
+  const ok = acc ? await pwVerify(acc, p) : false;
+
+  if (!ok) {
     const attempt = recordFailedAttempt();
     showLoginError(attempt.msg);
-    
+
     // Log failed attempt
     logIt('login_failed', `Failed login attempt for user: ${u}`, 'all', {
       attempts: AUTH_STATE.loginAttempts,
       locked: attempt.locked
     });
-    
+
     $('#lkPass').value = '';
     $('#lkPass').focus();
     return;
   }
-  
+
+  // Checked only after the password is known to be right, so that a wrong
+  // password cannot be used to discover which accounts are deactivated
+  if (acc.active === 0) {
+    showLoginError('This account has been deactivated. Ask a manager to re-enable it.');
+    logIt('login_failed', `Sign-in refused, account deactivated: ${u}`, 'all', { user: u });
+    $('#lkPass').value = '';
+    return;
+  }
+
   // Clear error
   hideLoginError();
   
@@ -5445,19 +5717,19 @@ function validateNewPassword(p) {
 /**
  * Process password change
  */
-function changePassword() {
+async function changePassword() {
   const cur = $('#pwCur').value;
   const neu = $('#pwNew').value;
   const con = $('#pwCon').value;
-  
+
   // Validate current password
-  const curUser = S.users.find((x) => x.u === VIEW.user.u && x.p === cur);
-  if (!curUser) {
+  const curUser = S.users.find((x) => x.u === VIEW.user.u);
+  if (!curUser || !(await pwVerify(curUser, cur))) {
     toast('Current password is incorrect', 'bad');
     $('#pwCur').focus();
     return;
   }
-  
+
   // Validate new password
   const newVal = validateNewPassword(neu);
   if (!newVal.valid) {
@@ -5480,12 +5752,13 @@ function changePassword() {
     return;
   }
   
-  // Update password
+  // Update password. VIEW.user is the same object as the S.users entry, so
+  // this updates both.
   const user = S.users.find((x) => x.u === VIEW.user.u);
   if (user) {
-    user.p = neu;
-    saveState();
-    
+    await pwSet(user, neu);
+    await saveState();
+
     // Log password change
     logIt('password_changed', `User changed password: ${VIEW.user.name}`, 'all', {
       user: VIEW.user.u
@@ -8711,6 +8984,9 @@ function renderAdmin() {
               <div class="card-s">${S.users.length} users · permissions are set per account</div>
             </div>
             <div class="r" style="display:flex;gap:8px">
+              ${S.users.some(pwIsLegacy)
+                ? '<button class="btn sm" onclick="securePasswords()">Secure passwords</button>'
+                : ''}
               <label class="btn sm" style="cursor:pointer">Import list
                 <input type="file" accept="application/json" style="display:none" onchange="impUsers(this)">
               </label>
@@ -8724,8 +9000,11 @@ function renderAdmin() {
                 <div style="min-width:0">
                   <div class="al-t">${esc(u.name)}</div>
                   <div class="al-s mono">
-                    ${esc(u.u)} · ${canDo('admin', 'accounts') ? esc(u.p) : '••••••••'} · ${esc(siteSummary(u))}
+                    ${esc(u.u)} · ${esc(siteSummary(u))}
                   </div>
+                  ${pwIsLegacy(u)
+                    ? '<div class="al-s" style="color:var(--low)">Password not secured yet</div>'
+                    : ''}
                   <div class="al-s">${esc(permSummary(u))}</div>
                 </div>
                 <div class="al-r">
@@ -9046,7 +9325,12 @@ function userModal(u) {
         <label>Username</label>
         <input id="ufUser" class="mono" value="${esc(a.u)}" ${u ? 'disabled' : ''} autocapitalize="none">
       </div>
-      <div class="fld"><label>Password</label><input id="ufPass" class="mono" value="${esc(a.p)}"></div>
+      <div class="fld">
+        <label>${u ? 'New password' : 'Password'}</label>
+        <input id="ufPass" type="password" class="mono" value="" autocomplete="new-password"
+          placeholder="${u ? 'Leave blank to keep the current one' : 'At least 6 characters'}">
+        ${u ? '<div class="hlp">Stored scrambled — the current one cannot be shown.</div>' : ''}
+      </div>
     </div>
     <div class="f2">
       <div class="fld">
@@ -9119,9 +9403,33 @@ function permDiff(before, after) {
 }
 
 /**
+ * Scramble any password still held in readable form.
+ *
+ * Signing in upgrades an account on its own, but an account whose owner has not
+ * signed in since the upgrade would otherwise keep a readable password — and
+ * once accounts are shared, that would travel. This lets the manager deal with
+ * all of them at once, on their own device, at a moment of their choosing.
+ */
+async function securePasswords() {
+  if (!canDo('admin', 'accounts')) return toast('Manager access required', 'bad');
+
+  const stale = S.users.filter(pwIsLegacy);
+  if (!stale.length) return toast('Every password is already secured', 'good');
+
+  toast(`Securing ${stale.length} password${stale.length === 1 ? '' : 's'}…`);
+
+  for (const u of stale) await pwSet(u, String(u.p));
+
+  logIt('perm', `Secured ${stale.length} stored password${stale.length === 1 ? '' : 's'}`, 'all');
+  await saveState();
+  render();
+  toast(`${stale.length} password${stale.length === 1 ? '' : 's'} secured`, 'good');
+}
+
+/**
  * Save the account editor
  */
-function saveUser(u) {
+async function saveUser(u) {
   if (!canDo('admin', 'accounts')) return toast('Manager access required', 'bad');
 
   const name = $('#ufName').value.trim();
@@ -9131,7 +9439,15 @@ function saveUser(u) {
   const active = $('#ufActive') && $('#ufActive').value === '0' ? 0 : 1;
   const self = !!u && u === VIEW.user.u;
 
-  if (!name || !p) return toast('Name and password are required', 'bad');
+  if (!name) return toast('Name is required', 'bad');
+
+  // Editing keeps the existing password when the field is left blank; only a
+  // new account has to be given one.
+  if (!u && !p) return toast('A password is required for a new account', 'bad');
+  if (p) {
+    const v = validatePassword(p);
+    if (!v.valid) return toast(v.msg, 'bad');
+  }
 
   const perms = canDo('admin', 'perms') ? JSON.parse(JSON.stringify(PERM_DRAFT)) : null;
 
@@ -9150,9 +9466,11 @@ function saveUser(u) {
     const before = permsFor(acc);
 
     Object.assign(acc, {
-      name, p, role, active, sites,
-      site: sites.length === 1 ? sites[0] : 'all'
+      name, role, active, sites,
+      site: sites.length === 1 ? sites[0] : 'all',
+      updated: Date.now()
     });
+    if (p) await pwSet(acc, p);
     if (perms) acc.perms = perms;
 
     const d = perms ? permDiff(before, perms) : { on: [], off: [] };
@@ -9166,8 +9484,10 @@ function saveUser(u) {
     if (S.users.some((x) => x.u === user)) return toast('That username already exists', 'bad');
 
     const acc = {
-      u: user, p, name, role, active, sites,
-      site: sites.length === 1 ? sites[0] : 'all'
+      u: user, name, role, active, sites,
+      site: sites.length === 1 ? sites[0] : 'all',
+      updated: Date.now(),
+      ...(await pwHash(p))
     };
     if (perms) acc.perms = perms;
     S.users.push(acc);
@@ -9203,7 +9523,7 @@ function impUsers(inp) {
 
   const r = new FileReader();
 
-  r.onload = (e) => {
+  r.onload = async (e) => {
     inp.value = '';
 
     let list;
@@ -9219,25 +9539,36 @@ function impUsers(inp) {
     const skipped = [];
     const rejected = [];
 
-    list.forEach((a) => {
-      const u = String(a.u || '').trim().toLowerCase();
+    if (list.length > 3) toast('Securing passwords…');
 
-      if (!u || !a.p || !a.name) return rejected.push(u || '(no username)');
-      if (!ROLES[a.role]) return rejected.push(u + ' (unknown role)');
-      if (String(a.p).length < 6) return rejected.push(u + ' (password too short)');
-      if (S.users.some((x) => x.u === u)) return skipped.push(u);
+    for (const a of list) {
+      const u = String(a.u || '').trim().toLowerCase();
+      const hashed = a.hash && a.salt;
+
+      if (!u || !a.name || (!hashed && !a.p)) { rejected.push(u || '(no username)'); continue; }
+      if (!ROLES[a.role]) { rejected.push(u + ' (unknown role)'); continue; }
+      if (!hashed && String(a.p).length < 6) { rejected.push(u + ' (password too short)'); continue; }
+      if (S.users.some((x) => x.u === u)) { skipped.push(u); continue; }
+
+      // An already-hashed record is carried across verbatim, so a team can be
+      // moved between deployments without anyone's password being known.
+      const cred = hashed
+        ? { pwAlg: a.pwAlg || PW_ALG, pwIter: Number(a.pwIter) || PW_ITER, salt: String(a.salt), hash: String(a.hash) }
+        : await pwHash(String(a.p));
 
       S.users.push({
         u,
-        p: String(a.p),
         name: String(a.name),
         position: a.position ? String(a.position) : '',
         idCard: a.idCard ? String(a.idCard) : '',
         role: a.role,
-        site: a.site && a.site !== 'all' && S.sites.some((s) => s.id === a.site) ? a.site : 'all'
+        site: a.site && a.site !== 'all' && S.sites.some((s) => s.id === a.site) ? a.site : 'all',
+        active: a.active === 0 ? 0 : 1,
+        updated: Date.now(),
+        ...cred
       });
       added.push(u);
-    });
+    }
 
     if (!added.length && !skipped.length) {
       return toast('Nothing in that file could be imported', 'bad');
@@ -9245,7 +9576,7 @@ function impUsers(inp) {
 
     if (added.length) {
       logIt('add', `Imported ${added.length} account${added.length === 1 ? '' : 's'}: ${added.join(', ')}`, 'all');
-      saveState();
+      await saveState();
     }
 
     render();
@@ -9436,9 +9767,18 @@ async function expJSON() {
   // A full backup carries the activity log with it, so it follows the same rule
   if (!can('export')) return toast('Manager access required', 'bad');
 
+  // A backup keeps salts and hashes so it can restore sign-in, but never a
+  // readable password — a backup may be taken part-way through the upgrade.
+  const users = S.users.map((u) => {
+    const c = { ...u };
+    delete c.p;
+    if (!c.hash) c.needsPassword = 1;
+    return c;
+  });
+
   const ok = await dl(
     `voltgrid-store-${iso(today())}.json`,
-    JSON.stringify(Object.assign({}, S, { _photos: PH }), null, 2)
+    JSON.stringify(Object.assign({}, S, { users, _photos: PH }), null, 2)
   );
   if (ok) toast('Backup downloaded', 'good');
 }
@@ -9487,6 +9827,12 @@ function impJSON(inp) {
 
       S = migrate(d);
       if (!S.cfg) S.cfg = { appName: 'SPARE PARTS MANAGEMENT SYSTEM', logo: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNOVCI+CiAgPHRpdGxlPlNOVDwvdGl0bGU+CiAgPGcgZmlsbD0iIzIzOUI0MSI+CiAgICA8IS0tIGJyb2tlbiByaW5nOiB0d28gdGFwZXJlZCBhcmNzLCAxODAgZGVncmVlcyBhcGFydCAtLT4KICAgIDxwYXRoIGQ9Ik0gNTguNCA4OS4zIEEgNjggNjggMCAwIDEgMTgxLjYgODkuMyBBIDgzLjI1IDgzLjI1IDAgMCAwIDU4LjQgODkuMyBaIi8+CiAgICA8cGF0aCBkPSJNIDU4LjQgODkuMyBBIDY4IDY4IDAgMCAxIDE4MS42IDg5LjMgQSA4My4yNSA4My4yNSAwIDAgMCA1OC40IDg5LjMgWiIKICAgICAgICAgIHRyYW5zZm9ybT0icm90YXRlKDE4MCAxMjAgMTE4KSIvPgoKICAgIDwhLS0gTiwgd2l0aCB0aGUgYXBvc3Ryb3BoZSBzbGFzaCBwdW5jaGVkIG91dCBvZiB0aGUgcmlnaHQgc3RlbSAtLT4KICAgIDxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTSAxMDAgODggTCAxMTYgODggTCAxNDIgMTE5LjUgTCAxNDIgODggTCAxNTggODggTCAxNTggMTQ1CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEwgMTQyIDE0NSBMIDExNiAxMTMuNSBMIDExNiAxNDUgTCAxMDAgMTQ1IFoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTSAxNDIgMTA1IEwgMTU4IDg4IEwgMTYxLjU0IDkxLjU0IEwgMTQ1LjU0IDEwOC41NCBaIi8+CgogICAgPCEtLSBULCBhbmdsZWQgbGVmdCBlbmQgb24gdGhlIGNyb3NzYmFyIC0tPgogICAgPHBhdGggZD0iTSAxODMgODggTCAyMjQgODggTCAyMjQgMTA1IEwgMjA3IDEwNSBMIDIwNyAxNDUgTCAxOTAgMTQ1IEwgMTkwIDEwNSBMIDE2NiAxMDUgWiIvPgogIDwvZz4KCiAgPCEtLSBTLCBkcmF3biBhcyBhIHN0cm9rZWQgc3BpbmUgc28gdGhlIHdlaWdodCBzdGF5cyBldmVuIC0tPgogIDxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIzOUI0MSIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiCiAgICAgICAgZD0iTSA5NCA5NiBMIDQzIDk2IEEgMTAgMTAgMCAwIDAgMzMgMTA2IEwgMzMgMTA2LjUgQSAxMCAxMCAwIDAgMCA0MyAxMTYuNQogICAgICAgICAgIEwgNzYgMTE2LjUgQSAxMCAxMCAwIDAgMSA4NiAxMjYuNSBMIDg2IDEyNyBBIDEwIDEwIDAgMCAxIDc2IDEzNyBMIDI1IDEzNyIvPgo8L3N2Zz4K', sheetUrl: '', poSeq: 1 };
+
+      // This path bypasses loadState, so the way-back-in repair has to run here
+      // too — a backup full of accounts with no credential would be a brick.
+      if (ensureSignInPossible()) {
+        toast('That backup had no account that could sign in — the setup account was restored', 'bad');
+      }
 
       // A backup larger than this device can hold must not report success
       const okState = await saveState();
@@ -9826,7 +10172,11 @@ async function initApp() {
   try {
     // Initialize storage
     await initStorage();
-    
+
+    // Pick the password hashing engine before loadState, which may have to
+    // repair a store back to the shipped account
+    await initPwEngine();
+
     // Load state or initialize with seed
     await loadState();
     

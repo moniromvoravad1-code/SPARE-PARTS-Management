@@ -62,6 +62,43 @@ async function saveState() {
   return r.ok;
 }
 
+/**
+ * Guarantee somebody can still get into Settings.
+ *
+ * If the last manager was deleted, deactivated, or left without any usable
+ * credential, restore the shipped account — otherwise the store is stuck at the
+ * lock screen for good, because the only reset lives behind a sign-in. An
+ * existing manager who can still sign in is never touched.
+ *
+ * Called from loadState, from the backup restore (which bypasses loadState),
+ * and after a pull adopts a remote account list.
+ *
+ * @returns {boolean} whether the shipped account had to be put back
+ */
+function ensureSignInPossible() {
+  const admins = S.users.filter((u) => {
+    const p = permsFor(u);
+    // A record with neither a hash nor a readable password cannot sign in, so
+    // it does not count as a way back in however many permissions it has.
+    return u.active !== 0 && p.admin && p.admin.accounts && (u.hash || u.p !== undefined);
+  });
+
+  if (admins.length) return false;
+
+  DEMO_USERS.forEach((d) => {
+    const found = S.users.find((u) => u.u === d.u);
+    if (found) {
+      Object.assign(found, { active: 1, role: d.role, perms: null, p: d.p, updated: Date.now() });
+      delete found.hash;
+      delete found.salt;
+    } else {
+      S.users.push({ ...d, updated: Date.now() });
+    }
+  });
+
+  return true;
+}
+
 // Load state from storage
 async function loadState() {
   const loaded = await dbGet(LS_KEY, storeLooksUsable);
@@ -72,22 +109,7 @@ async function loadState() {
     S = seed();
   }
 
-  // If nothing in the saved store can still reach Settings -- the last manager
-  // was deleted or deactivated -- restore the shipped account. Without this the
-  // store is stuck at the lock screen for good, since the only reset lives
-  // behind a sign-in. An existing manager is never touched.
-  const admins = S.users.filter((u) => {
-    const p = permsFor(u);
-    return u.active !== 0 && p.admin && p.admin.accounts;
-  });
-
-  if (!admins.length) {
-    DEMO_USERS.forEach((d) => {
-      const found = S.users.find((u) => u.u === d.u);
-      if (found) Object.assign(found, { active: 1, role: d.role, perms: null });
-      else S.users.push({ ...d });
-    });
-  }
+  ensureSignInPossible();
 
   // Fill in anything an older backup predates
   if (!S.log) S.log = [];

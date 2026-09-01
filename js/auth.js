@@ -82,7 +82,7 @@ function resetLoginAttempts() {
 /**
  * Attempt login with username and password
  */
-function doLogin() {
+async function doLogin() {
   // Check if account is locked
   const lockCheck = isAccountLocked();
   if (lockCheck.locked) {
@@ -108,32 +108,40 @@ function doLogin() {
     return;
   }
   
-  // Find matching user
-  const acc = S.users.find((x) => x.u === u && x.p === p);
+  const acc = S.users.find((x) => x.u === u);
 
-  // A deactivated account is refused even with the right password
-  if (acc && acc.active === 0) {
-    showLoginError('This account has been deactivated. Ask a manager to re-enable it.');
-    logIt('login_failed', `Sign-in refused, account deactivated: ${u}`, 'all', { user: u });
-    $('#lkPass').value = '';
-    return;
-  }
-  
-  if (!acc) {
+  // An unknown username must cost the same as a wrong password, or the delay
+  // tells an attacker which usernames exist.
+  if (!acc) await pwDerive(p, PW_DUMMY_SALT, PW_ITER);
+
+  // pwVerify upgrades a record that still holds a readable password, but only
+  // when the password given is the right one
+  const ok = acc ? await pwVerify(acc, p) : false;
+
+  if (!ok) {
     const attempt = recordFailedAttempt();
     showLoginError(attempt.msg);
-    
+
     // Log failed attempt
     logIt('login_failed', `Failed login attempt for user: ${u}`, 'all', {
       attempts: AUTH_STATE.loginAttempts,
       locked: attempt.locked
     });
-    
+
     $('#lkPass').value = '';
     $('#lkPass').focus();
     return;
   }
-  
+
+  // Checked only after the password is known to be right, so that a wrong
+  // password cannot be used to discover which accounts are deactivated
+  if (acc.active === 0) {
+    showLoginError('This account has been deactivated. Ask a manager to re-enable it.');
+    logIt('login_failed', `Sign-in refused, account deactivated: ${u}`, 'all', { user: u });
+    $('#lkPass').value = '';
+    return;
+  }
+
   // Clear error
   hideLoginError();
   
@@ -380,19 +388,19 @@ function validateNewPassword(p) {
 /**
  * Process password change
  */
-function changePassword() {
+async function changePassword() {
   const cur = $('#pwCur').value;
   const neu = $('#pwNew').value;
   const con = $('#pwCon').value;
-  
+
   // Validate current password
-  const curUser = S.users.find((x) => x.u === VIEW.user.u && x.p === cur);
-  if (!curUser) {
+  const curUser = S.users.find((x) => x.u === VIEW.user.u);
+  if (!curUser || !(await pwVerify(curUser, cur))) {
     toast('Current password is incorrect', 'bad');
     $('#pwCur').focus();
     return;
   }
-  
+
   // Validate new password
   const newVal = validateNewPassword(neu);
   if (!newVal.valid) {
@@ -415,12 +423,13 @@ function changePassword() {
     return;
   }
   
-  // Update password
+  // Update password. VIEW.user is the same object as the S.users entry, so
+  // this updates both.
   const user = S.users.find((x) => x.u === VIEW.user.u);
   if (user) {
-    user.p = neu;
-    saveState();
-    
+    await pwSet(user, neu);
+    await saveState();
+
     // Log password change
     logIt('password_changed', `User changed password: ${VIEW.user.name}`, 'all', {
       user: VIEW.user.u

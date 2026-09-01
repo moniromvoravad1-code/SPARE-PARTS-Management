@@ -159,7 +159,11 @@ async function initApp() {
   try {
     // Initialize storage
     await initStorage();
-    
+
+    // Pick the password hashing engine before loadState, which may have to
+    // repair a store back to the shipped account
+    await initPwEngine();
+
     // Load state or initialize with seed
     await loadState();
     
