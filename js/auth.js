@@ -256,7 +256,7 @@ function enter(acc, rememberMe = false) {
   // Save state with remember-me
   if (rememberMe) {
     S.session.rememberMe = true;
-    localStorage.setItem('voltgrid_rememberMe', 'true');
+    lsSet(REMEMBER_KEY, 'true');
   }
   saveState();
   
@@ -288,11 +288,11 @@ function signOut() {
   // Clear session
   VIEW.user = null;
   S.session = null;
-  localStorage.removeItem('voltgrid_rememberMe');
-  
-  // Save state
-  dbSet(LS_KEY, S);
-  
+  lsDel(REMEMBER_KEY);
+
+  // Save state. VIEW.user is already null, so saveState() clears S.session too.
+  saveState();
+
   // Update UI
   $('#app').classList.remove('on');
   $('#lock').classList.remove('gone');
@@ -520,7 +520,7 @@ function initAuth() {
   lockHint();
 
   // Check for remembered session
-  const remembered = localStorage.getItem('voltgrid_rememberMe') === 'true';
+  const remembered = lsGet(REMEMBER_KEY) === 'true';
   if (remembered && S.session) {
     const user = S.users.find((u) => u.u === S.session.u);
     if (user) {

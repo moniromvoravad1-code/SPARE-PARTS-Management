@@ -7,11 +7,27 @@ const DB_NAME = 'voltgrid_store';
 const DB_STORE = 'kv';
 const LS_KEY = 'voltgrid_store_v1';
 const PH_KEY = 'voltgrid_store_photos';
+const REMEMBER_KEY = 'voltgrid_rememberMe';
 
 // Photo processing
 const PH_MAX = 640;        // Max dimension in pixels
 const PH_Q = 0.72;         // JPEG quality
-const PH_BUDGET = 4.2 * 1024 * 1024;  // 4.2 MB total budget
+
+/**
+ * How much photo data will fit, which depends entirely on where it is going.
+ *
+ * localStorage is capped near 5 MB per origin and is charged two bytes per
+ * character, while photoBytes() counts characters. Taking off the main store
+ * and some headroom for the activity log leaves roughly 1.6 MB of characters,
+ * about 25 photos at the size the uploader produces. IndexedDB is disk-bound,
+ * so its ceiling exists only to keep the Settings meter meaningful.
+ *
+ * Read these through photoBudget() in storage.js, never directly - the picker
+ * and the meter have to agree on which backend is actually live.
+ */
+const PH_BUDGET_LS = 1.6 * 1024 * 1024;
+const PH_BUDGET_IDB = 64 * 1024 * 1024;
+const PH_BUDGET = PH_BUDGET_LS;   // conservative default before storage is probed
 
 // Constants
 const DAY = 86400000;      // Milliseconds in a day

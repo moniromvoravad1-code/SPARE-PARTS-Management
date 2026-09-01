@@ -10,23 +10,43 @@ function renderAdmin() {
 
   const photoStats = () => {
     const b = photoBytes(PH);
-    const pct = Math.min(100, b / PH_BUDGET * 100);
+    const cap = photoBudget();
+    const pct = Math.min(100, b / cap * 100);
+    const over = b > cap;
     const withPh = S.parts.filter((p) => p.photo).length + S.tools.filter((t) => t.photo).length;
     const linked = S.parts.filter((p) => /^https?:/i.test(p.photo || '')).length +
       S.tools.filter((t) => /^https?:/i.test(t.photo || '')).length;
     const n = Object.keys(PH).length;
 
+    // The two backends mean genuinely different things, so say which one is
+    // live rather than showing a bar that means something different each time.
+    const where = !STORE.idb && !STORE.ls
+      ? 'This browser is not saving anything from this file. Nothing you enter will be kept.'
+      : STORE.idb
+        ? 'Saved in this browser\'s database — there is room for hundreds of photos.'
+        : 'This browser\'s database is not available here, so photos share its 5 MB of storage ' +
+          'with your data. About 25 photos fit.' +
+          (STORE.why === 'timeout'
+            ? ' The database did not respond when the app opened — closing other copies of this file and reopening may restore it.'
+            : '');
+
     return `
       <div style="display:flex;justify-content:space-between;font-size:12.5px">
         <b>${n} photo${n === 1 ? '' : 's'} on device</b>
         <span class="mono" style="color:var(--ink2)">
-          ${(b / 1024 / 1024).toFixed(2)} MB of ${(PH_BUDGET / 1024 / 1024).toFixed(1)} MB</span>
+          ${(b / 1024 / 1024).toFixed(2)} MB of ${(cap / 1024 / 1024).toFixed(1)} MB</span>
       </div>
-      <div class="bar-use"><i class="${pct > 90 ? 'full' : pct > 70 ? 'warn' : ''}" style="width:${pct}%"></i></div>
+      <div class="bar-use"><i class="${over || pct > 90 ? 'full' : pct > 70 ? 'warn' : ''}" style="width:${pct}%"></i></div>
+      ${over
+        ? `<div style="font-size:11.5px;color:var(--out);font-weight:600">
+             Over the limit — remove some photos, or switch them to links.
+           </div>`
+        : ''}
       <div style="font-size:11.5px;color:var(--ink3)">
         ${withPh} of ${S.parts.length + S.tools.length} items have a photo ·
         ${linked} use an external link (no device storage)
       </div>
+      <div style="font-size:11.5px;color:var(--ink3);margin-top:4px">${where}</div>
     `;
   };
 
@@ -883,26 +903,30 @@ function impJSON(inp) {
 
   const r = new FileReader();
 
-  r.onload = (e) => {
+  r.onload = async (e) => {
     try {
       const d = JSON.parse(e.target.result);
       if (!d.parts || !d.tools) throw new Error('not a backup');
 
+      let okPhotos = true;
       if (d._photos && typeof d._photos === 'object') {
         PH = d._photos;
-        savePhotos();
+        okPhotos = await savePhotos();
       }
       delete d._photos;
 
       S = migrate(d);
       if (!S.cfg) S.cfg = { appName: 'SPARE PARTS MANAGEMENT SYSTEM', logo: 'assets/logo.svg', sheetUrl: '', poSeq: 1 };
 
-      saveState();
+      // A backup larger than this device can hold must not report success
+      const okState = await saveState();
+
       brand();
       buildSites();
       buildNav();
       render();
-      toast('Backup restored', 'good');
+
+      if (okState && okPhotos) toast('Backup restored', 'good');
     } catch (err) {
       toast('That file is not an SNT backup', 'bad');
     }

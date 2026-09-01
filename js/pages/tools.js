@@ -256,7 +256,7 @@ function toolModal(id) {
 /**
  * Save the tool editor
  */
-function saveTool(id) {
+async function saveTool(id) {
   const g = (k) => $('#tf' + k).value.trim();
 
   if (!g('Name')) return toast('Tool name is required', 'bad');
@@ -288,13 +288,15 @@ function saveTool(id) {
     logIt('add', `Added tool ${base.name} (${base.code})`, base.site);
   }
 
-  saveState();
-  if (phDirty) savePhotos();
+  // Awaited so the outcome is known before we claim it worked
+  const okState = await saveState();
+  const okPhotos = phDirty ? await savePhotos() : true;
 
   closeModal();
   buildNav();
   render();
-  toast(id ? 'Tool updated' : 'Tool added', 'good');
+
+  if (okState && okPhotos) toast(id ? 'Tool updated' : 'Tool added', 'good');
 }
 
 /**

@@ -35,26 +35,38 @@ let VIEW = {
   user: null
 };
 
-// Save state to storage
+/**
+ * Only trust a saved store that still has accounts in it. A blank or
+ * half-written record would otherwise load over the defaults and leave nobody
+ * able to sign in. An empty parts or tools list is a legitimate state — someone
+ * may have deleted the last line — so it must never be read as "nothing saved
+ * yet" and reseeded over.
+ *
+ * dbGet takes this too, so a truncated record in one backend degrades to a miss
+ * and the good copy in the other one is found instead.
+ */
+const storeLooksUsable = (o) => !!o &&
+  Array.isArray(o.users) && o.users.length &&
+  Array.isArray(o.parts) && Array.isArray(o.tools);
+
+/**
+ * Save state to storage.
+ * @returns {Promise<boolean>} whether the store is actually safe on this device
+ */
 async function saveState() {
   S.session = VIEW.user ? { u: VIEW.user.u, at: Date.now() } : null;
-  await dbSet(LS_KEY, S);
+
+  const r = await dbSet(LS_KEY, S);
+  if (!r.ok) reportSaveFailure('Your changes could not be saved on this device', r);
+
+  return r.ok;
 }
 
 // Load state from storage
 async function loadState() {
-  const loaded = await dbGet(LS_KEY);
+  const loaded = await dbGet(LS_KEY, storeLooksUsable);
 
-  // Only trust a saved store that still has accounts in it. A blank or
-  // half-written record would otherwise load over the defaults and leave
-  // nobody able to sign in. An empty parts or tools list is a legitimate
-  // state — someone may have deleted the last line — so it must never be
-  // read as "nothing saved yet" and reseeded over.
-  const usable = loaded &&
-    Array.isArray(loaded.users) && loaded.users.length &&
-    Array.isArray(loaded.parts) && Array.isArray(loaded.tools);
-
-  if (usable) {
+  if (storeLooksUsable(loaded)) {
     S = migrate({ ...S, ...loaded });
   } else {
     S = seed();

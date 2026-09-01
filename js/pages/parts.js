@@ -494,7 +494,7 @@ function partModal(id) {
 /**
  * Save the part editor
  */
-function savePart(id) {
+async function savePart(id) {
   const g = (k) => $('#pf' + k).value.trim();
   const n = (k) => Number($('#pf' + k).value) || 0;
 
@@ -524,13 +524,18 @@ function savePart(id) {
     logIt('add', `Added part ${p.name} (${p.sku}) with ${p.qty} ${p.unit}`, p.site);
   }
 
-  saveState();
-  if (phDirty) savePhotos();
+  // Awaited so the outcome is known before we claim it worked. The edit is
+  // already in memory either way, so still close and repaint.
+  const okState = await saveState();
+  const okPhotos = phDirty ? await savePhotos() : true;
 
   closeModal();
   buildNav();
   render();
-  toast(id ? 'Part updated' : 'Part added', 'good');
+
+  // On failure the storage layer has already said so in red — do not paper
+  // over it with a success message.
+  if (okState && okPhotos) toast(id ? 'Part updated' : 'Part added', 'good');
 }
 
 /**

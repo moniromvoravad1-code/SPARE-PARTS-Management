@@ -12,7 +12,11 @@ import re
 import sys
 
 ROOT = r'c:\Users\Dell\Downloads\files'
-OUT = os.path.join(ROOT, 'spare-parts-management.html')
+
+# The shipped product. This is the file people are handed, so a fix that has not
+# been rebuilt has not been shipped - treat running this script as part of done.
+OUT_DIR = os.path.join(ROOT, 'Final')
+OUT = os.path.join(OUT_DIR, 'Spare Parts Management System.html')
 
 
 def read(rel):
@@ -74,15 +78,21 @@ html = html.replace(
     '       Generated from index.html; edit the source files, not this one. -->',
     1)
 
+if not os.path.isdir(OUT_DIR):
+    os.makedirs(OUT_DIR)
+
 with io.open(OUT, 'w', encoding='utf-8', newline='') as f:
     f.write(html)
 
 size = os.path.getsize(OUT)
 print('wrote %s (%.0f KB)' % (OUT, size / 1024.0))
 
-# Nothing may still point outside the file
-leftovers = re.findall(r'(?:src|href)="(?!data:|#|https://fonts\.)([^"]+)"', html)
-external = [x for x in leftovers if not x.startswith('data:')]
+# Nothing may still point outside the file. Only real markup attributes count -
+# a ${...} inside inlined JS is a template placeholder, not a fetch.
+leftovers = re.findall(r'(?:src|href)="([^"]+)"', html)
+external = [x for x in leftovers
+            if not x.startswith(('data:', '#'))
+            and '${' not in x]
 print('external references remaining:', external if external else 'none')
 if external:
     sys.exit(1)

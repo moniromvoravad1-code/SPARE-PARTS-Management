@@ -2315,11 +2315,27 @@ const DB_NAME = 'voltgrid_store';
 const DB_STORE = 'kv';
 const LS_KEY = 'voltgrid_store_v1';
 const PH_KEY = 'voltgrid_store_photos';
+const REMEMBER_KEY = 'voltgrid_rememberMe';
 
 // Photo processing
 const PH_MAX = 640;        // Max dimension in pixels
 const PH_Q = 0.72;         // JPEG quality
-const PH_BUDGET = 4.2 * 1024 * 1024;  // 4.2 MB total budget
+
+/**
+ * How much photo data will fit, which depends entirely on where it is going.
+ *
+ * localStorage is capped near 5 MB per origin and is charged two bytes per
+ * character, while photoBytes() counts characters. Taking off the main store
+ * and some headroom for the activity log leaves roughly 1.6 MB of characters,
+ * about 25 photos at the size the uploader produces. IndexedDB is disk-bound,
+ * so its ceiling exists only to keep the Settings meter meaningful.
+ *
+ * Read these through photoBudget() in storage.js, never directly - the picker
+ * and the meter have to agree on which backend is actually live.
+ */
+const PH_BUDGET_LS = 1.6 * 1024 * 1024;
+const PH_BUDGET_IDB = 64 * 1024 * 1024;
+const PH_BUDGET = PH_BUDGET_LS;   // conservative default before storage is probed
 
 // Constants
 const DAY = 86400000;      // Milliseconds in a day
@@ -2545,97 +2561,336 @@ function inventoryValue(parts) {
 /* ===== js/storage.js ===== */
 /**
  * js/storage.js - IndexedDB and localStorage abstraction layer
+ *
+ * The app is shipped as a single file that people open by double-clicking it,
+ * so this layer has to survive a `file://` origin: IndexedDB is sometimes
+ * blocked or slow there, and Safari throws on `localStorage` outright. The
+ * rules that follow from that:
+ *
+ *   - one backend is chosen before the first read and kept for the session
+ *   - a read that misses in IndexedDB still consults localStorage, so data
+ *     written in a localStorage-only session is never seeded over
+ *   - a write that lands nowhere says so, instead of failing quietly
  */
 
 let _db = null;
 
-// Open IndexedDB connection
-function openDB() {
-  return new Promise((res) => {
-    if (!window.indexedDB) return res(null);
-    try {
-      const r = indexedDB.open(DB_NAME, 1);
-      r.onupgradeneeded = (e) => {
-        const d = e.target.result;
-        if (!d.objectStoreNames.contains(DB_STORE)) {
-          d.createObjectStore(DB_STORE);
+/** What is actually live this session. Read by the photo budget and Settings. */
+let STORE = { idb: false, ls: false, why: 'init' };
+
+/** Keys whose IndexedDB write failed - do not read a stale copy back. */
+const _idbBad = new Set();
+
+/** Set once a save has failed, so the UI can stay honest about it. */
+let STORAGE_FAILED = false;
+
+/* ---------- localStorage, guarded ---------- */
+
+// Safari throws from the property getter itself on file://, so every access
+// has to sit inside the try - `typeof localStorage` is not a safe pre-check.
+
+function lsGet(k) {
+  try {
+    return localStorage.getItem(k);
+  } catch (e) {
+    STORE.ls = false;
+    return null;
+  }
+}
+
+function lsSet(k, v) {
+  try {
+    localStorage.setItem(k, v);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function lsDel(k) {
+  try {
+    localStorage.removeItem(k);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function lsProbe() {
+  try {
+    localStorage.setItem('__vg_probe', '1');
+    localStorage.removeItem('__vg_probe');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ---------- IndexedDB ---------- */
+
+/**
+ * Open the database, or give up cleanly.
+ *
+ * A handle that turns up after the timeout is closed rather than adopted:
+ * loadState() runs immediately after initStorage(), so a late handle would mean
+ * the read came from localStorage while every later write went to a database
+ * the reader never looked at - the same split store this module exists to
+ * prevent. One backend, chosen before the first read.
+ */
+function openDB(timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    if (!window.indexedDB) return resolve({ db: null, why: 'no-indexeddb' });
+
+    let settled = false;
+    let timer = null;
+
+    const finish = (db, why) => {
+      if (settled) {
+        if (db) {
+          try { db.close(); } catch (e) { /* nothing to do */ }
         }
-      };
-      r.onsuccess = (e) => res(e.target.result);
-      r.onerror = () => res(null);
-      setTimeout(() => res(_db), 2500);
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve({ db, why });
+    };
+
+    let r;
+    try {
+      r = indexedDB.open(DB_NAME, 1);
     } catch (e) {
-      res(null);
+      return resolve({ db: null, why: 'open-threw' });
+    }
+
+    r.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(DB_STORE)) d.createObjectStore(DB_STORE);
+    };
+
+    r.onsuccess = (e) => {
+      const db = e.target.result;
+      db.onversionchange = () => {
+        try { db.close(); } catch (x) { /* nothing to do */ }
+        _db = null;
+        STORE.idb = false;
+      };
+      db.onclose = () => {
+        _db = null;
+        STORE.idb = false;
+      };
+      finish(db, 'ok');
+    };
+
+    r.onerror = () => finish(null, 'open-error');
+
+    // Another copy of the app holding an older version open. Rare with a fixed
+    // version, but without this handler neither success nor error ever fires.
+    r.onblocked = () => finish(null, 'blocked');
+
+    timer = setTimeout(() => finish(null, 'timeout'), timeoutMs);
+  });
+}
+
+/**
+ * A database can open successfully and still be unusable - a half-failed
+ * upgrade leaves it without the object store, and every transaction then
+ * throws. Find that out once, here, rather than on every read.
+ */
+function idbProbe(db) {
+  return new Promise((res) => {
+    try {
+      const t = db.transaction(DB_STORE, 'readonly').objectStore(DB_STORE).get('__probe');
+      t.onsuccess = () => res(true);
+      t.onerror = () => res(false);
+    } catch (e) {
+      res(false);
     }
   });
 }
 
-// Get value from IndexedDB or localStorage
-async function dbGet(k) {
-  // Try IndexedDB first
-  if (_db) {
-    try {
-      return await new Promise((res, rej) => {
-        const t = _db.transaction(DB_STORE, 'readonly').objectStore(DB_STORE).get(k);
-        t.onsuccess = () => res(t.result);
-        t.onerror = () => rej();
-      });
-    } catch (e) {
-      // Fall through to localStorage
-    }
-  }
-  
-  // Fall back to localStorage
-  try {
-    const v = localStorage.getItem(k);
-    return v ? JSON.parse(v) : undefined;
-  } catch (e) {
-    return undefined;
-  }
+function idbGet(k) {
+  return new Promise((res, rej) => {
+    const t = _db.transaction(DB_STORE, 'readonly').objectStore(DB_STORE).get(k);
+    t.onsuccess = () => res(t.result);
+    t.onerror = () => rej(t.error);
+  });
 }
 
-// Set value in IndexedDB and localStorage
-async function dbSet(k, v) {
-  // Write to IndexedDB if available
-  if (_db) {
-    try {
-      await new Promise((res, rej) => {
-        const t = _db.transaction(DB_STORE, 'readwrite').objectStore(DB_STORE).put(v, k);
-        t.onsuccess = () => res();
-        t.onerror = () => rej();
-      });
-    } catch (e) {
-      // Continue to localStorage
-    }
-  }
-  
-  // Always write to localStorage as backup
-  try {
-    localStorage.setItem(k, JSON.stringify(v));
-  } catch (e) {
-    console.warn('Storage quota exceeded or unavailable');
-  }
+function idbPut(k, v) {
+  return new Promise((res, rej) => {
+    const t = _db.transaction(DB_STORE, 'readwrite').objectStore(DB_STORE).put(v, k);
+    t.onsuccess = () => res();
+    t.onerror = () => rej(t.error);
+  });
 }
 
-// Clear all data
+/* ---------- read / write ---------- */
+
+/**
+ * Read a value, preferring IndexedDB but never letting an empty one hide a
+ * good localStorage copy.
+ *
+ * @param {string} k
+ * @param {function} [looksUsable] - rejects a record that is present but broken,
+ *   so a truncated write degrades to a miss instead of triggering a reseed
+ */
+async function dbGet(k, looksUsable) {
+  let idbVal;
+  let idbHit = false;
+  let idbFaulted = false;
+
+  if (_db && !_idbBad.has(k)) {
+    try {
+      idbVal = await idbGet(k);
+      idbHit = idbVal !== undefined;
+    } catch (e) {
+      // We no longer know what IndexedDB holds for this key
+      idbFaulted = true;
+    }
+  }
+
+  // dbSet writes IndexedDB first, so where the two disagree localStorage is the
+  // stale one. A good hit therefore wins outright.
+  if (idbHit && (!looksUsable || looksUsable(idbVal))) return idbVal;
+
+  let lsVal;
+  try {
+    const raw = localStorage.getItem(k);
+    if (raw) lsVal = JSON.parse(raw);
+  } catch (e) {
+    if (e instanceof SyntaxError) console.warn('Corrupt localStorage record for', k);
+    else STORE.ls = false;
+  }
+
+  if (lsVal !== undefined && (!looksUsable || looksUsable(lsVal))) {
+    // Converge the two stores, but only after a clean miss - then we know for a
+    // fact IndexedDB held nothing here, so nothing fresher can be lost. Awaited
+    // on purpose: a queued put could otherwise land after migrate() and
+    // saveState() and overwrite the migrated store with this older copy.
+    if (_db && !idbFaulted && !idbHit) {
+      try { await idbPut(k, lsVal); } catch (e) { /* stay on localStorage */ }
+    }
+    return lsVal;
+  }
+
+  // A record we could not validate still beats nothing at all
+  if (idbHit) return idbVal;
+
+  return undefined;
+}
+
+/**
+ * Write a value and report where it actually landed.
+ *
+ * @returns {Promise<{ok:boolean, idb:boolean, ls:boolean, err:string|null}>}
+ *   ok  - durable in at least one backend
+ *   err - 'quota' | 'security' | 'idb' | 'none' | null
+ */
+async function dbSet(k, v, opts) {
+  const out = { ok: false, idb: false, ls: false, err: null };
+  const mirror = !opts || opts.mirror !== false;
+
+  if (_db) {
+    try {
+      await idbPut(k, v);
+      out.idb = true;
+      _idbBad.delete(k);
+    } catch (e) {
+      out.err = 'idb';
+      // Reading this key back from IndexedDB would now return a stale value
+      _idbBad.add(k);
+      console.warn('IndexedDB write failed for', k, e);
+    }
+  }
+
+  if (mirror) {
+    try {
+      localStorage.setItem(k, JSON.stringify(v));
+      out.ls = true;
+    } catch (e) {
+      out.err = /security/i.test(e.name) ? 'security' : 'quota';
+      if (out.err === 'security') STORE.ls = false;
+    }
+  }
+
+  // One backend is enough. A full localStorage while IndexedDB is healthy is
+  // ordinary, and must not be reported as a failure.
+  out.ok = out.idb || out.ls;
+  if (!out.ok && !out.err) out.err = 'none';
+
+  return out;
+}
+
+/**
+ * Tell the user a save did not stick, and keep saying so after the toast goes.
+ */
+function reportSaveFailure(what, r) {
+  STORAGE_FAILED = true;
+
+  const why = r.err === 'quota'
+    ? 'Storage on this device is full — remove some photos in Settings.'
+    : r.err === 'security'
+      ? 'This browser blocks saving for files opened directly. Open it from a web address instead.'
+      : 'Storage on this device refused the write.';
+
+  console.error(what, r);
+  toast(what + '. ' + why, 'bad');
+
+  if (typeof setSync === 'function') setSync('● not saving', '#FF9A92');
+}
+
+/**
+ * How much photo data fits, given the backend that is actually live.
+ */
+function photoBudget() {
+  return STORE.idb ? PH_BUDGET_IDB : PH_BUDGET_LS;
+}
+
+/**
+ * Remove this app's data from the device. Scoped to our own keys: under
+ * file:// every local page shares one origin, so localStorage.clear() would
+ * take unrelated pages' data with it.
+ */
 async function dbClear() {
   if (_db) {
     try {
-      const t = _db.transaction(DB_STORE, 'readwrite').objectStore(DB_STORE).clear();
       await new Promise((res, rej) => {
+        const t = _db.transaction(DB_STORE, 'readwrite').objectStore(DB_STORE).clear();
         t.onsuccess = () => res();
-        t.onerror = () => rej();
+        t.onerror = () => rej(t.error);
       });
     } catch (e) {
-      // Continue
+      // fall through and still clear localStorage
     }
   }
-  localStorage.clear();
+
+  [LS_KEY, PH_KEY, REMEMBER_KEY].forEach(lsDel);
 }
 
-// Initialize storage on app load
+/**
+ * Choose the backend for this session, before anything is read.
+ */
 async function initStorage() {
-  _db = await openDB();
+  const t0 = Date.now();
+  const opened = await openDB();
+  const usable = opened.db ? await idbProbe(opened.db) : false;
+
+  if (opened.db && !usable) {
+    try { opened.db.close(); } catch (e) { /* nothing to do */ }
+  }
+
+  _db = usable ? opened.db : null;
+  STORE.idb = !!_db;
+  STORE.ls = lsProbe();
+  STORE.why = usable ? 'ok' : (opened.why === 'ok' ? 'store-missing' : opened.why);
+
+  if (!STORE.idb) {
+    console.warn(`IndexedDB unavailable (${STORE.why}) after ${Date.now() - t0}ms — using localStorage`);
+  }
+  if (!STORE.idb && !STORE.ls) {
+    console.error('No storage backend available:', STORE.why);
+  }
 }
 
 /* ===== js/state.js ===== */
@@ -2676,26 +2931,38 @@ let VIEW = {
   user: null
 };
 
-// Save state to storage
+/**
+ * Only trust a saved store that still has accounts in it. A blank or
+ * half-written record would otherwise load over the defaults and leave nobody
+ * able to sign in. An empty parts or tools list is a legitimate state — someone
+ * may have deleted the last line — so it must never be read as "nothing saved
+ * yet" and reseeded over.
+ *
+ * dbGet takes this too, so a truncated record in one backend degrades to a miss
+ * and the good copy in the other one is found instead.
+ */
+const storeLooksUsable = (o) => !!o &&
+  Array.isArray(o.users) && o.users.length &&
+  Array.isArray(o.parts) && Array.isArray(o.tools);
+
+/**
+ * Save state to storage.
+ * @returns {Promise<boolean>} whether the store is actually safe on this device
+ */
 async function saveState() {
   S.session = VIEW.user ? { u: VIEW.user.u, at: Date.now() } : null;
-  await dbSet(LS_KEY, S);
+
+  const r = await dbSet(LS_KEY, S);
+  if (!r.ok) reportSaveFailure('Your changes could not be saved on this device', r);
+
+  return r.ok;
 }
 
 // Load state from storage
 async function loadState() {
-  const loaded = await dbGet(LS_KEY);
+  const loaded = await dbGet(LS_KEY, storeLooksUsable);
 
-  // Only trust a saved store that still has accounts in it. A blank or
-  // half-written record would otherwise load over the defaults and leave
-  // nobody able to sign in. An empty parts or tools list is a legitimate
-  // state — someone may have deleted the last line — so it must never be
-  // read as "nothing saved yet" and reseeded over.
-  const usable = loaded &&
-    Array.isArray(loaded.users) && loaded.users.length &&
-    Array.isArray(loaded.parts) && Array.isArray(loaded.tools);
-
-  if (usable) {
+  if (storeLooksUsable(loaded)) {
     S = migrate({ ...S, ...loaded });
   } else {
     S = seed();
@@ -4284,10 +4551,18 @@ function photoSrc(o) {
 }
 
 /**
- * Save photos to storage
+ * Save photos to storage.
+ *
+ * Mirroring a multi-megabyte photo bag into localStorage is guaranteed to blow
+ * its quota, so skip the mirror once IndexedDB has taken the write.
+ *
+ * @returns {Promise<boolean>} whether the photos are actually safe on this device
  */
 async function savePhotos() {
-  await dbSet(PH_KEY, PH);
+  const r = await dbSet(PH_KEY, PH, { mirror: !STORE.idb });
+  if (!r.ok) reportSaveFailure('That photo could not be saved on this device', r);
+
+  return r.ok;
 }
 
 /**
@@ -4459,7 +4734,17 @@ async function pickPhoto(inp) {
     const data = await shrinkImage(f);
     const kb = Math.round(data.length * 0.75 / 1024);
 
-    if (photoBytes(PH) + data.length > PH_BUDGET) {
+    if (!STORE.idb && !STORE.ls) {
+      return phPreview(
+        photoSrc({ photo: EDITPH }),
+        'This browser is not saving anything from this file, so a photo cannot be kept. Use a link instead.'
+      );
+    }
+
+    // photoBudget(), not the constant — the picker and the Settings meter have
+    // to agree on which backend is live, or one will accept what the other says
+    // will not fit.
+    if (photoBytes(PH) + data.length > photoBudget()) {
       return phPreview(
         photoSrc({ photo: EDITPH }),
         'Photo storage is full. Remove some photos first, or use a link instead.'
@@ -4526,8 +4811,9 @@ function commitPhoto(o) {
   return true;
 }
 
-// Initialize photos on app load
-loadPhotos();
+// Photos are loaded from initApp(), after initStorage() has chosen a backend.
+// Reading here at parse time would go to localStorage every time, whatever the
+// app later decides to use.
 
 /* ===== js/ui/components.js ===== */
 /**
@@ -5035,7 +5321,7 @@ function enter(acc, rememberMe = false) {
   // Save state with remember-me
   if (rememberMe) {
     S.session.rememberMe = true;
-    localStorage.setItem('voltgrid_rememberMe', 'true');
+    lsSet(REMEMBER_KEY, 'true');
   }
   saveState();
   
@@ -5067,11 +5353,11 @@ function signOut() {
   // Clear session
   VIEW.user = null;
   S.session = null;
-  localStorage.removeItem('voltgrid_rememberMe');
-  
-  // Save state
-  dbSet(LS_KEY, S);
-  
+  lsDel(REMEMBER_KEY);
+
+  // Save state. VIEW.user is already null, so saveState() clears S.session too.
+  saveState();
+
   // Update UI
   $('#app').classList.remove('on');
   $('#lock').classList.remove('gone');
@@ -5299,7 +5585,7 @@ function initAuth() {
   lockHint();
 
   // Check for remembered session
-  const remembered = localStorage.getItem('voltgrid_rememberMe') === 'true';
+  const remembered = lsGet(REMEMBER_KEY) === 'true';
   if (remembered && S.session) {
     const user = S.users.find((u) => u.u === S.session.u);
     if (user) {
@@ -6562,7 +6848,7 @@ function partModal(id) {
 /**
  * Save the part editor
  */
-function savePart(id) {
+async function savePart(id) {
   const g = (k) => $('#pf' + k).value.trim();
   const n = (k) => Number($('#pf' + k).value) || 0;
 
@@ -6592,13 +6878,18 @@ function savePart(id) {
     logIt('add', `Added part ${p.name} (${p.sku}) with ${p.qty} ${p.unit}`, p.site);
   }
 
-  saveState();
-  if (phDirty) savePhotos();
+  // Awaited so the outcome is known before we claim it worked. The edit is
+  // already in memory either way, so still close and repaint.
+  const okState = await saveState();
+  const okPhotos = phDirty ? await savePhotos() : true;
 
   closeModal();
   buildNav();
   render();
-  toast(id ? 'Part updated' : 'Part added', 'good');
+
+  // On failure the storage layer has already said so in red — do not paper
+  // over it with a success message.
+  if (okState && okPhotos) toast(id ? 'Part updated' : 'Part added', 'good');
 }
 
 /**
@@ -6944,7 +7235,7 @@ function toolModal(id) {
 /**
  * Save the tool editor
  */
-function saveTool(id) {
+async function saveTool(id) {
   const g = (k) => $('#tf' + k).value.trim();
 
   if (!g('Name')) return toast('Tool name is required', 'bad');
@@ -6976,13 +7267,15 @@ function saveTool(id) {
     logIt('add', `Added tool ${base.name} (${base.code})`, base.site);
   }
 
-  saveState();
-  if (phDirty) savePhotos();
+  // Awaited so the outcome is known before we claim it worked
+  const okState = await saveState();
+  const okPhotos = phDirty ? await savePhotos() : true;
 
   closeModal();
   buildNav();
   render();
-  toast(id ? 'Tool updated' : 'Tool added', 'good');
+
+  if (okState && okPhotos) toast(id ? 'Tool updated' : 'Tool added', 'good');
 }
 
 /**
@@ -8287,23 +8580,43 @@ function renderAdmin() {
 
   const photoStats = () => {
     const b = photoBytes(PH);
-    const pct = Math.min(100, b / PH_BUDGET * 100);
+    const cap = photoBudget();
+    const pct = Math.min(100, b / cap * 100);
+    const over = b > cap;
     const withPh = S.parts.filter((p) => p.photo).length + S.tools.filter((t) => t.photo).length;
     const linked = S.parts.filter((p) => /^https?:/i.test(p.photo || '')).length +
       S.tools.filter((t) => /^https?:/i.test(t.photo || '')).length;
     const n = Object.keys(PH).length;
 
+    // The two backends mean genuinely different things, so say which one is
+    // live rather than showing a bar that means something different each time.
+    const where = !STORE.idb && !STORE.ls
+      ? 'This browser is not saving anything from this file. Nothing you enter will be kept.'
+      : STORE.idb
+        ? 'Saved in this browser\'s database — there is room for hundreds of photos.'
+        : 'This browser\'s database is not available here, so photos share its 5 MB of storage ' +
+          'with your data. About 25 photos fit.' +
+          (STORE.why === 'timeout'
+            ? ' The database did not respond when the app opened — closing other copies of this file and reopening may restore it.'
+            : '');
+
     return `
       <div style="display:flex;justify-content:space-between;font-size:12.5px">
         <b>${n} photo${n === 1 ? '' : 's'} on device</b>
         <span class="mono" style="color:var(--ink2)">
-          ${(b / 1024 / 1024).toFixed(2)} MB of ${(PH_BUDGET / 1024 / 1024).toFixed(1)} MB</span>
+          ${(b / 1024 / 1024).toFixed(2)} MB of ${(cap / 1024 / 1024).toFixed(1)} MB</span>
       </div>
-      <div class="bar-use"><i class="${pct > 90 ? 'full' : pct > 70 ? 'warn' : ''}" style="width:${pct}%"></i></div>
+      <div class="bar-use"><i class="${over || pct > 90 ? 'full' : pct > 70 ? 'warn' : ''}" style="width:${pct}%"></i></div>
+      ${over
+        ? `<div style="font-size:11.5px;color:var(--out);font-weight:600">
+             Over the limit — remove some photos, or switch them to links.
+           </div>`
+        : ''}
       <div style="font-size:11.5px;color:var(--ink3)">
         ${withPh} of ${S.parts.length + S.tools.length} items have a photo ·
         ${linked} use an external link (no device storage)
       </div>
+      <div style="font-size:11.5px;color:var(--ink3);margin-top:4px">${where}</div>
     `;
   };
 
@@ -9160,26 +9473,30 @@ function impJSON(inp) {
 
   const r = new FileReader();
 
-  r.onload = (e) => {
+  r.onload = async (e) => {
     try {
       const d = JSON.parse(e.target.result);
       if (!d.parts || !d.tools) throw new Error('not a backup');
 
+      let okPhotos = true;
       if (d._photos && typeof d._photos === 'object') {
         PH = d._photos;
-        savePhotos();
+        okPhotos = await savePhotos();
       }
       delete d._photos;
 
       S = migrate(d);
       if (!S.cfg) S.cfg = { appName: 'SPARE PARTS MANAGEMENT SYSTEM', logo: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNOVCI+CiAgPHRpdGxlPlNOVDwvdGl0bGU+CiAgPGcgZmlsbD0iIzIzOUI0MSI+CiAgICA8IS0tIGJyb2tlbiByaW5nOiB0d28gdGFwZXJlZCBhcmNzLCAxODAgZGVncmVlcyBhcGFydCAtLT4KICAgIDxwYXRoIGQ9Ik0gNTguNCA4OS4zIEEgNjggNjggMCAwIDEgMTgxLjYgODkuMyBBIDgzLjI1IDgzLjI1IDAgMCAwIDU4LjQgODkuMyBaIi8+CiAgICA8cGF0aCBkPSJNIDU4LjQgODkuMyBBIDY4IDY4IDAgMCAxIDE4MS42IDg5LjMgQSA4My4yNSA4My4yNSAwIDAgMCA1OC40IDg5LjMgWiIKICAgICAgICAgIHRyYW5zZm9ybT0icm90YXRlKDE4MCAxMjAgMTE4KSIvPgoKICAgIDwhLS0gTiwgd2l0aCB0aGUgYXBvc3Ryb3BoZSBzbGFzaCBwdW5jaGVkIG91dCBvZiB0aGUgcmlnaHQgc3RlbSAtLT4KICAgIDxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTSAxMDAgODggTCAxMTYgODggTCAxNDIgMTE5LjUgTCAxNDIgODggTCAxNTggODggTCAxNTggMTQ1CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEwgMTQyIDE0NSBMIDExNiAxMTMuNSBMIDExNiAxNDUgTCAxMDAgMTQ1IFoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTSAxNDIgMTA1IEwgMTU4IDg4IEwgMTYxLjU0IDkxLjU0IEwgMTQ1LjU0IDEwOC41NCBaIi8+CgogICAgPCEtLSBULCBhbmdsZWQgbGVmdCBlbmQgb24gdGhlIGNyb3NzYmFyIC0tPgogICAgPHBhdGggZD0iTSAxODMgODggTCAyMjQgODggTCAyMjQgMTA1IEwgMjA3IDEwNSBMIDIwNyAxNDUgTCAxOTAgMTQ1IEwgMTkwIDEwNSBMIDE2NiAxMDUgWiIvPgogIDwvZz4KCiAgPCEtLSBTLCBkcmF3biBhcyBhIHN0cm9rZWQgc3BpbmUgc28gdGhlIHdlaWdodCBzdGF5cyBldmVuIC0tPgogIDxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIzOUI0MSIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiCiAgICAgICAgZD0iTSA5NCA5NiBMIDQzIDk2IEEgMTAgMTAgMCAwIDAgMzMgMTA2IEwgMzMgMTA2LjUgQSAxMCAxMCAwIDAgMCA0MyAxMTYuNQogICAgICAgICAgIEwgNzYgMTE2LjUgQSAxMCAxMCAwIDAgMSA4NiAxMjYuNSBMIDg2IDEyNyBBIDEwIDEwIDAgMCAxIDc2IDEzNyBMIDI1IDEzNyIvPgo8L3N2Zz4K', sheetUrl: '', poSeq: 1 };
 
-      saveState();
+      // A backup larger than this device can hold must not report success
+      const okState = await saveState();
+
       brand();
       buildSites();
       buildNav();
       render();
-      toast('Backup restored', 'good');
+
+      if (okState && okPhotos) toast('Backup restored', 'good');
     } catch (err) {
       toast('That file is not an SNT backup', 'bad');
     }
@@ -9555,7 +9872,7 @@ async function initApp() {
     // sign-out, which clears S.session, or a session past the ceiling does
     // that. "Remember me" lifts the ceiling so the sign-in also survives
     // closing the browser.
-    const rememberMe = localStorage.getItem('voltgrid_rememberMe') === 'true';
+    const rememberMe = lsGet(REMEMBER_KEY) === 'true';
     const resumable = S.session &&
       (rememberMe || Date.now() - S.session.at < SESSION_CONFIG.maxSessionDuration);
 

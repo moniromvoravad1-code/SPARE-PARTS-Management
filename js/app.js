@@ -205,7 +205,7 @@ async function initApp() {
     // sign-out, which clears S.session, or a session past the ceiling does
     // that. "Remember me" lifts the ceiling so the sign-in also survives
     // closing the browser.
-    const rememberMe = localStorage.getItem('voltgrid_rememberMe') === 'true';
+    const rememberMe = lsGet(REMEMBER_KEY) === 'true';
     const resumable = S.session &&
       (rememberMe || Date.now() - S.session.at < SESSION_CONFIG.maxSessionDuration);
 

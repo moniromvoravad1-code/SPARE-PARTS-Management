@@ -20,10 +20,18 @@ function photoSrc(o) {
 }
 
 /**
- * Save photos to storage
+ * Save photos to storage.
+ *
+ * Mirroring a multi-megabyte photo bag into localStorage is guaranteed to blow
+ * its quota, so skip the mirror once IndexedDB has taken the write.
+ *
+ * @returns {Promise<boolean>} whether the photos are actually safe on this device
  */
 async function savePhotos() {
-  await dbSet(PH_KEY, PH);
+  const r = await dbSet(PH_KEY, PH, { mirror: !STORE.idb });
+  if (!r.ok) reportSaveFailure('That photo could not be saved on this device', r);
+
+  return r.ok;
 }
 
 /**
@@ -195,7 +203,17 @@ async function pickPhoto(inp) {
     const data = await shrinkImage(f);
     const kb = Math.round(data.length * 0.75 / 1024);
 
-    if (photoBytes(PH) + data.length > PH_BUDGET) {
+    if (!STORE.idb && !STORE.ls) {
+      return phPreview(
+        photoSrc({ photo: EDITPH }),
+        'This browser is not saving anything from this file, so a photo cannot be kept. Use a link instead.'
+      );
+    }
+
+    // photoBudget(), not the constant — the picker and the Settings meter have
+    // to agree on which backend is live, or one will accept what the other says
+    // will not fit.
+    if (photoBytes(PH) + data.length > photoBudget()) {
       return phPreview(
         photoSrc({ photo: EDITPH }),
         'Photo storage is full. Remove some photos first, or use a link instead.'
@@ -262,5 +280,6 @@ function commitPhoto(o) {
   return true;
 }
 
-// Initialize photos on app load
-loadPhotos();
+// Photos are loaded from initApp(), after initStorage() has chosen a backend.
+// Reading here at parse time would go to localStorage every time, whatever the
+// app later decides to use.
