@@ -14,6 +14,18 @@
  * Edit values directly in the Parts and Tools tabs, then Pull to bring the changes into the app.
  */
 
+/**
+ * The spreadsheet this endpoint reads and writes.
+ *
+ * Taken from the sheet's own URL:
+ *   https://docs.google.com/spreadsheets/d/THIS_PART/edit
+ *
+ * Setting it explicitly means the script works whether you created it from
+ * inside the sheet (Extensions ▸ Apps Script) or as a standalone project.
+ * Leave it empty to use whichever sheet the script is attached to.
+ */
+var SHEET_ID = '1thSXAHKVB_1M6ICV27P9Urr0mcIPQLHBZbGdCOEAwEY';
+
 var TABS = {
   Parts: ['id','sku','name','cat','site','qty','min','unit','bin','cost','sup','lt','war','warFrom','photo','updated'],
   Tools: ['id','code','name','cat','site','status','holder','outAt','dueAt','calInt','calLast','calNext','cert','war','warFrom','photo','cond','notes'],
@@ -121,8 +133,14 @@ function readTab(name) {
 
 /* ---------------- helpers ---------------- */
 
+function book() {
+  var ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('No spreadsheet. Set SHEET_ID at the top of this script.');
+  return ss;
+}
+
 function tab(name) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = book();
   return ss.getSheetByName(name) || ss.insertSheet(name);
 }
 

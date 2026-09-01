@@ -15,7 +15,7 @@ let S = {
     appName: 'VoltGrid Store',
     logo: '',
     sheetUrl: '',
-    autoSync: false,
+    autoSync: true,
     poSeq: 15
   },
   session: null
@@ -59,7 +59,7 @@ async function loadState() {
   // Fill in anything an older backup predates
   if (!S.log) S.log = [];
   if (!S.pos) S.pos = [];
-  if (!S.cfg) S.cfg = { appName: 'VoltGrid Store', logo: '', sheetUrl: '', autoSync: false, poSeq: 1 };
+  if (!S.cfg) S.cfg = { appName: 'VoltGrid Store', logo: '', sheetUrl: '', autoSync: true, poSeq: 1 };
 }
 
 // Add activity log entry

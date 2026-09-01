@@ -236,7 +236,7 @@ function seed() {
       appName: 'VoltGrid Store',
       logo: '',
       sheetUrl: '',
-      autoSync: false,
+      autoSync: true,
       poSeq: 15
     },
     session: null

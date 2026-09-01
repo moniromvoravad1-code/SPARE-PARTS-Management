@@ -6,7 +6,12 @@ every device reads the same parts, tools, orders, sites and history.
 
 ## One-time setup
 
-1. **Create a Google Sheet.** Any new, empty sheet will do.
+1. **Open the store's Google Sheet.** The script is already pointed at this one:
+
+   `https://docs.google.com/spreadsheets/d/1thSXAHKVB_1M6ICV27P9Urr0mcIPQLHBZbGdCOEAwEY/edit`
+
+   To use a different sheet, copy the id out of its URL — the part between
+   `/d/` and `/edit` — and set `SHEET_ID` at the top of `Code_Store.gs`.
 2. **Extensions → Apps Script.** Delete whatever is in the editor and paste in
    the whole of [`Code_Store.gs`](Code_Store.gs) from this repo. Save.
 3. **Deploy → New deployment → Web app**, with:
