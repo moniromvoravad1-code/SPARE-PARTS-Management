@@ -432,6 +432,65 @@ function changePassword() {
 }
 
 /**
+ * First-run help under the sign-in form.
+ *
+ * While the store is still exactly as shipped, the setup credential is shown --
+ * it is readable in the page source anyway, and a person who cannot get in has
+ * no other way to find it. It disappears the moment the password is changed or
+ * a second account exists. The reset is always offered, because otherwise a
+ * forgotten password leaves the app unusable on that device.
+ */
+function lockHint() {
+  const box = $('#lkHint');
+  if (!box) return;
+
+  const shipped = DEMO_USERS[0];
+  const untouched = S.users.length === 1 &&
+    S.users[0].u === shipped.u &&
+    S.users[0].p === shipped.p;
+
+  box.innerHTML = `
+    ${untouched
+      ? `<div class="lk-hint-k">
+           First run — sign in with <b>${esc(shipped.u)}</b> / <b>${esc(shipped.p)}</b>,
+           then change the password and add your team in Settings.
+         </div>`
+      : ''}
+    <button type="button" class="lk-hint-a" onclick="resetDevice()">Trouble signing in?</button>
+  `;
+  box.classList.remove('hide');
+}
+
+/**
+ * Clear this device's copy and start over. The store lives only in this
+ * browser, so this is the way back in when nobody can sign in.
+ */
+function resetDevice() {
+  openModal('Reset this device', 'Start again from the shipped account', `
+    <p style="font-size:13.5px;margin:0 0 10px">
+      This clears the copy of the store held in <b>this browser</b> and starts
+      again from the shipped manager account and the sample data.
+    </p>
+    <p style="font-size:13px;color:var(--ink2);margin:0">
+      Accounts, stock, tools, orders and history saved on this device are
+      removed. Anything already written to your Google Sheet is not affected and
+      comes back on the next sync. Other people's devices are untouched.
+    </p>
+  `, `
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn dgr" onclick="doResetDevice()">Reset this device</button>
+  `);
+}
+
+/**
+ * Wipe local storage and reload into a fresh store
+ */
+async function doResetDevice() {
+  await dbClear();
+  location.reload();
+}
+
+/**
  * Initialize authentication UI
  */
 function initAuth() {
@@ -458,6 +517,8 @@ function initAuth() {
     if (e.key === 'Enter') doLogin();
   });
   
+  lockHint();
+
   // Check for remembered session
   const remembered = localStorage.getItem('voltgrid_rememberMe') === 'true';
   if (remembered && S.session) {

@@ -60,6 +60,23 @@ async function loadState() {
     S = seed();
   }
 
+  // If nothing in the saved store can still reach Settings -- the last manager
+  // was deleted or deactivated -- restore the shipped account. Without this the
+  // store is stuck at the lock screen for good, since the only reset lives
+  // behind a sign-in. An existing manager is never touched.
+  const admins = S.users.filter((u) => {
+    const p = permsFor(u);
+    return u.active !== 0 && p.admin && p.admin.accounts;
+  });
+
+  if (!admins.length) {
+    DEMO_USERS.forEach((d) => {
+      const found = S.users.find((u) => u.u === d.u);
+      if (found) Object.assign(found, { active: 1, role: d.role, perms: null });
+      else S.users.push({ ...d });
+    });
+  }
+
   // Fill in anything an older backup predates
   if (!S.log) S.log = [];
   if (!S.pos) S.pos = [];

@@ -2183,6 +2183,47 @@ a {
   }
 }
 
+/* ============ SIGN-IN HELP ============ */
+.lk-hint {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  text-align: center;
+}
+
+.lk-hint-k {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #9FB0C7;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 9px;
+  padding: 9px 12px;
+}
+
+.lk-hint-k b {
+  color: #E8EEF6;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.lk-hint-a {
+  background: none;
+  border: 0;
+  padding: 4px;
+  font-size: 12px;
+  color: #8695AA;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.lk-hint-a:hover {
+  color: #C7D4E4;
+}
+
   </style>
 </head>
 <body>
@@ -2215,6 +2256,7 @@ a {
         <label for="lkRemember" style="font-size:12px;color:var(--ink3);cursor:pointer;margin:0">Remember me on this device</label>
       </div>
       <button class="lk-go" id="lkGo">Sign in</button>
+      <div id="lkHint" class="lk-hint hide"></div>
     </div>
   </div>
 
@@ -2657,6 +2699,23 @@ async function loadState() {
     S = migrate({ ...S, ...loaded });
   } else {
     S = seed();
+  }
+
+  // If nothing in the saved store can still reach Settings -- the last manager
+  // was deleted or deactivated -- restore the shipped account. Without this the
+  // store is stuck at the lock screen for good, since the only reset lives
+  // behind a sign-in. An existing manager is never touched.
+  const admins = S.users.filter((u) => {
+    const p = permsFor(u);
+    return u.active !== 0 && p.admin && p.admin.accounts;
+  });
+
+  if (!admins.length) {
+    DEMO_USERS.forEach((d) => {
+      const found = S.users.find((u) => u.u === d.u);
+      if (found) Object.assign(found, { active: 1, role: d.role, perms: null });
+      else S.users.push({ ...d });
+    });
   }
 
   // Fill in anything an older backup predates
@@ -5152,6 +5211,65 @@ function changePassword() {
 }
 
 /**
+ * First-run help under the sign-in form.
+ *
+ * While the store is still exactly as shipped, the setup credential is shown --
+ * it is readable in the page source anyway, and a person who cannot get in has
+ * no other way to find it. It disappears the moment the password is changed or
+ * a second account exists. The reset is always offered, because otherwise a
+ * forgotten password leaves the app unusable on that device.
+ */
+function lockHint() {
+  const box = $('#lkHint');
+  if (!box) return;
+
+  const shipped = DEMO_USERS[0];
+  const untouched = S.users.length === 1 &&
+    S.users[0].u === shipped.u &&
+    S.users[0].p === shipped.p;
+
+  box.innerHTML = `
+    ${untouched
+      ? `<div class="lk-hint-k">
+           First run — sign in with <b>${esc(shipped.u)}</b> / <b>${esc(shipped.p)}</b>,
+           then change the password and add your team in Settings.
+         </div>`
+      : ''}
+    <button type="button" class="lk-hint-a" onclick="resetDevice()">Trouble signing in?</button>
+  `;
+  box.classList.remove('hide');
+}
+
+/**
+ * Clear this device's copy and start over. The store lives only in this
+ * browser, so this is the way back in when nobody can sign in.
+ */
+function resetDevice() {
+  openModal('Reset this device', 'Start again from the shipped account', `
+    <p style="font-size:13.5px;margin:0 0 10px">
+      This clears the copy of the store held in <b>this browser</b> and starts
+      again from the shipped manager account and the sample data.
+    </p>
+    <p style="font-size:13px;color:var(--ink2);margin:0">
+      Accounts, stock, tools, orders and history saved on this device are
+      removed. Anything already written to your Google Sheet is not affected and
+      comes back on the next sync. Other people's devices are untouched.
+    </p>
+  `, `
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn dgr" onclick="doResetDevice()">Reset this device</button>
+  `);
+}
+
+/**
+ * Wipe local storage and reload into a fresh store
+ */
+async function doResetDevice() {
+  await dbClear();
+  location.reload();
+}
+
+/**
  * Initialize authentication UI
  */
 function initAuth() {
@@ -5178,6 +5296,8 @@ function initAuth() {
     if (e.key === 'Enter') doLogin();
   });
   
+  lockHint();
+
   // Check for remembered session
   const remembered = localStorage.getItem('voltgrid_rememberMe') === 'true';
   if (remembered && S.session) {
