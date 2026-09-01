@@ -95,6 +95,7 @@ function readAll() {
       delete o.linesJSON;
       return o;
     }),
+    log: readTab('ActivityLog').sort(function (a, b) { return Number(b.ts) - Number(a.ts); }),
     pulledAt: new Date().toISOString()
   };
   return out;

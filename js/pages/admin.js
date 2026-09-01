@@ -66,6 +66,18 @@ function renderAdmin() {
             <input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.cfg.sheetUrl)}">
             <div class="hlp">Deploy the companion Apps Script as a web app, then paste the /exec URL here.</div>
           </div>
+          <div class="fld">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input id="cfgAuto" type="checkbox" style="width:16px;height:16px;cursor:pointer"
+                ${S.cfg.autoSync ? 'checked' : ''} onchange="saveAutoSync(this.checked)">
+              Load from the sheet every time the app opens
+            </label>
+            <div class="hlp">
+              The sheet becomes the source of truth — parts, tools, orders, sites and history are
+              replaced on each open. Accounts always stay on this device.
+              ${S.cfg.lastSync ? `Last read ${ago(S.cfg.lastSync)}.` : ''}
+            </div>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn pri" onclick="saveUrl()">Save URL</button>
             <button class="btn" onclick="syncPush()">Push to Sheets</button>
@@ -450,6 +462,17 @@ function saveUrl() {
   toast(S.cfg.sheetUrl ? 'Sheets URL saved' : 'Sheets URL cleared', 'good');
 }
 
+/**
+ * Turn "load from the sheet on open" on or off
+ */
+function saveAutoSync(on) {
+  S.cfg.autoSync = !!on;
+  saveState();
+
+  if (on && !S.cfg.sheetUrl) return toast('Add the Apps Script URL first', 'bad');
+  toast(on ? 'The sheet will load each time the app opens' : 'Automatic loading turned off', 'good');
+}
+
 /* ---------- photo maintenance ---------- */
 
 /**
@@ -706,7 +729,44 @@ async function syncPush() {
 }
 
 /**
- * Pull the store back down from the Apps Script endpoint
+ * Read the sheet and replace the local store with what it holds.
+ *
+ * Data only — no UI work — so this is safe to call before anyone has signed
+ * in. Accounts are never touched: they live on the device, not in the sheet.
+ *
+ * @returns {Promise<Object>} counts of what came back
+ * @throws if the endpoint is unreachable or answers with something unusable
+ */
+async function pullData() {
+  const r = await fetch(S.cfg.sheetUrl + '?action=pull');
+  const d = await r.json();
+
+  // A sheet with no Parts tab is almost always a wrong URL or a failed deploy,
+  // and overwriting good local data with it would be destructive.
+  if (!d || !Array.isArray(d.parts) || !d.parts.length) {
+    throw new Error('the sheet returned no parts');
+  }
+
+  S.parts = d.parts;
+  if (Array.isArray(d.tools)) S.tools = d.tools;
+  if (Array.isArray(d.pos)) S.pos = d.pos;
+  if (Array.isArray(d.sites) && d.sites.length) S.sites = d.sites;
+  if (Array.isArray(d.log)) S.log = d.log;
+
+  S.cfg.lastSync = Date.now();
+  await saveState();
+
+  return {
+    parts: S.parts.length,
+    tools: S.tools.length,
+    pos: S.pos.length,
+    sites: S.sites.length,
+    log: S.log.length
+  };
+}
+
+/**
+ * Pull the store back down from the Apps Script endpoint, and redraw
  */
 async function syncPull() {
   if (!S.cfg.sheetUrl) return toast('Add the Apps Script URL first', 'bad');
@@ -714,23 +774,17 @@ async function syncPull() {
   setSync('● syncing…', '#C2740D');
 
   try {
-    const r = await fetch(S.cfg.sheetUrl + '?action=pull');
-    const d = await r.json();
-    if (!d || !d.parts) throw new Error('empty response');
+    const n = await pullData();
 
-    S.parts = d.parts;
-    if (d.tools) S.tools = d.tools;
-    if (d.pos) S.pos = d.pos;
-    if (d.sites) S.sites = d.sites;
-
-    S.cfg.lastSync = Date.now();
-    saveState();
-    buildSites();
-    buildNav();
-    render();
+    // Only touch the UI if someone is actually looking at it
+    if (VIEW.user) {
+      buildSites();
+      buildNav();
+      render();
+    }
 
     setSync('● synced ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), '#8FE3C8');
-    toast('Pulled from Google Sheets', 'good');
+    toast(`Pulled ${n.parts} parts, ${n.tools} tools, ${n.pos} orders`, 'good');
   } catch (e) {
     setSync('● sync failed', '#FF9A92');
     toast('Could not read from the Sheets endpoint', 'bad');

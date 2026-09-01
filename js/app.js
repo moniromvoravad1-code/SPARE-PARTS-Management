@@ -152,6 +152,19 @@ async function initApp() {
     // Load device photos before anything can render a thumbnail
     await loadPhotos();
 
+    // With the sheet as the source of truth, read it before the first paint.
+    // A failure here is not fatal — the device keeps working on its own copy.
+    if (S.cfg.autoSync && S.cfg.sheetUrl) {
+      setSync('● reading sheet…', '#C2740D');
+      try {
+        const n = await pullData();
+        console.log(`✓ loaded from Google Sheets: ${n.parts} parts, ${n.tools} tools, ${n.pos} orders`);
+      } catch (e) {
+        console.warn('Could not read the sheet, using the copy on this device:', e.message);
+        toast('Could not reach Google Sheets — using this device’s data', 'bad');
+      }
+    }
+
     // Apply branding
     brand();
     tick();
