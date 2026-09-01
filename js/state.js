@@ -30,6 +30,7 @@ let VIEW = {
   stock: 'all',
   tab: 'all',
   catMode: 'value',
+  flowMode: 'month',
   user: null
 };
 

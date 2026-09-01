@@ -29,6 +29,78 @@ function flow(type, from, to) {
 }
 
 /**
+ * How many buckets each period shows, and what the last one is called
+ */
+const FLOW_SPANS = {
+  day: { n: 30, label: 'Last 30 days', partial: 'today' },
+  week: { n: 12, label: 'Last 12 weeks', partial: 'this week' },
+  month: { n: 12, label: 'Last 12 months', partial: 'this month' },
+  year: { n: 5, label: 'Last 5 years', partial: 'this year' }
+};
+
+/**
+ * Value in and out per period, oldest first.
+ *
+ * The last bucket is the one in progress, so it is always short — it is
+ * flagged with `now` so the chart can mark it as partial rather than let it
+ * read as a collapse in activity.
+ *
+ * @param {string} kind - 'day' | 'week' | 'month' | 'year'
+ * @param {number} [count] - buckets to return; defaults to the span above
+ */
+function flowBy(kind, count) {
+  const span = FLOW_SPANS[kind] || FLOW_SPANS.month;
+  const n = count || span.n;
+  const d = today();
+  const out = [];
+
+  const bucket = (from, to, label, year, now) => {
+    const issued = use(from, to);
+    const received = stockIn(from, to);
+    return {
+      label,
+      year,
+      out: issued.val,
+      in: received.val,
+      outQty: issued.qty,
+      inQty: received.qty,
+      now
+    };
+  };
+
+  for (let i = n - 1; i >= 0; i--) {
+    const now = i === 0;
+    let from;
+    let to;
+    let label;
+
+    if (kind === 'day') {
+      from = new Date(d.getFullYear(), d.getMonth(), d.getDate() - i);
+      to = new Date(d.getFullYear(), d.getMonth(), d.getDate() - i + 1);
+      label = String(from.getDate());
+    } else if (kind === 'week') {
+      const ws = weekStart();
+      from = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() - i * 7);
+      to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 7);
+      label = from.getDate() + ' ' + MON[from.getMonth()];
+    } else if (kind === 'year') {
+      const y = d.getFullYear() - i;
+      from = new Date(y, 0, 1);
+      to = new Date(y + 1, 0, 1);
+      label = String(y);
+    } else {
+      from = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      to = new Date(d.getFullYear(), d.getMonth() - i + 1, 1);
+      label = MON[from.getMonth()];
+    }
+
+    out.push(bucket(from, to, label, from.getFullYear(), now));
+  }
+
+  return out;
+}
+
+/**
  * Get parts issued out of store
  */
 const use = (f, t) => flow('issue', f, t);

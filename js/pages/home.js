@@ -244,6 +244,14 @@ function setCatMode(m) {
 }
 
 /**
+ * Switch the stock in vs out chart between day, week, month and year
+ */
+function setFlowMode(m) {
+  VIEW.flowMode = FLOW_SPANS[m] ? m : 'month';
+  render();
+}
+
+/**
  * Open the parts page filtered to one category
  */
 function goCat(c) {
@@ -279,7 +287,9 @@ function useBlock() {
   const moDays = d.getDate();
   const doy = Math.floor((d - yearStart()) / DAY) + 1;
 
-  const bars = byMonth(12);
+  const mode = VIEW.flowMode || 'month';
+  const span = FLOW_SPANS[mode] || FLOW_SPANS.month;
+  const bars = flowBy(mode);
   const peak = Math.max(...bars.map((b) => Math.max(b.in, b.out)), 1);
   const top = topUsed(monthStart(), 5);
   const topMax = Math.max(...top.map((t) => t.val), 1);
@@ -384,26 +394,37 @@ function useBlock() {
         <div class="card-h">
           <div>
             <div class="card-t">Stock in vs stock out</div>
-            <div class="card-s">Last 12 months by value</div>
+            <div class="card-s">${span.label} by value</div>
+          </div>
+          <div class="r">
+            <div class="seg">
+              ${[['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']].map(([k, l]) =>
+                `<button class="${mode === k ? 'on' : ''}" onclick="setFlowMode('${k}')">${l}</button>`
+              ).join('')}
+            </div>
           </div>
         </div>
         <div class="card-b">
           <div class="bars">
-            ${bars.map((b) => `
-              <div class="bcol ${b.now ? 'now' : ''}"
-                title="${b.label} ${b.year} — in ${money(b.in)} (${b.inQty}) · out ${money(b.out)} (${b.outQty})">
-                <div class="pair">
-                  <i class="bin" style="height:${Math.max(b.in / peak * 100, 1)}%"></i>
-                  <i class="bout" style="height:${Math.max(b.out / peak * 100, 1)}%"></i>
+            ${bars.map((b, i) => {
+              // 30 daily labels would collide, so caption every fifth bar and today
+              const showLabel = mode !== 'day' || i % 5 === 0 || b.now;
+              return `
+                <div class="bcol ${b.now ? 'now' : ''}"
+                  title="${b.label}${mode === 'year' ? '' : ' ' + b.year} — in ${money(b.in)} (${b.inQty}) · out ${money(b.out)} (${b.outQty})">
+                  <div class="pair">
+                    <i class="bin" style="height:${Math.max(b.in / peak * 100, 1)}%"></i>
+                    <i class="bout" style="height:${Math.max(b.out / peak * 100, 1)}%"></i>
+                  </div>
+                  <span>${showLabel ? b.label : '&nbsp;'}</span>
                 </div>
-                <span>${b.label}</span>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
           <div class="legend">
             <span><i style="background:var(--ok)"></i>Received in</span>
             <span><i style="background:var(--brand)"></i>Issued out</span>
-            <span>${MON[d.getMonth()]} is partial (day ${moDays})</span>
+            <span>${span.partial} is still running</span>
           </div>
         </div>
       </div>
