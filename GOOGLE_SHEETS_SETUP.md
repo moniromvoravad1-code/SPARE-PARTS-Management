@@ -26,13 +26,70 @@ every device reads the same parts, tools, orders, sites and history.
 
 ## Filling the sheet
 
-Press **Push to Sheets** once. That writes the device's current data up and
-creates the tabs: `Parts`, `Tools`, `PurchaseOrders`, `Sites`, `ActivityLog`.
+Three ways, pick one:
 
-From then on you can edit values directly in the sheet — quantities, minimums,
-costs, bin locations, suppliers — and bring them back with **Pull from Sheets**.
+- **Start from the app's demo data** — press **Push to Sheets** once. It writes
+  what the device holds and creates every tab, so you can see the shape and
+  edit over it.
+- **Start from the entry workbook** — open
+  [`voltgrid-data-entry.xlsx`](voltgrid-data-entry.xlsx), type your data into
+  it, then in the sheet: **File → Import → Upload → Insert new sheet(s)**.
+  Every tab is set up with the right headings, an example row to overwrite,
+  dropdowns on the fixed-choice columns, and a note on each heading.
+- **Start from empty tabs** — in the Apps Script editor, run `setupTabs()` once.
+  It creates all five tabs with headers and nothing else.
 
-Keep the header row exactly as written; the columns are matched by name.
+Then bring it into the app with **Pull from Sheets**.
+
+Keep the heading row exactly as written; columns are matched by name, so a
+renamed or reordered column is read as blank.
+
+## Column reference
+
+Leave `id` blank on rows you add — the app fills it in and then uses it to
+recognise the row. Never edit an existing `id`. Dates are `YYYY-MM-DD`; money
+and quantities are plain numbers with no `$` or thousands separators.
+
+**Parts** — `id`, `sku`, `name`, `cat`, `site`, `qty`, `min`, `unit`, `bin`,
+`cost`, `sup`, `lt`, `war`, `warFrom`, `photo`, `updated`
+
+| Column | Means |
+|---|---|
+| `sku` | Part number, must be unique |
+| `cat` | Battery, PCS, HVAC, Electrical, Fire, Comms, Mechanical, Consumable |
+| `site` | A code from the Sites tab, e.g. `TMP` |
+| `qty` / `min` | On hand, and the level at or below which it counts as low |
+| `unit` | pcs, m, box, set, cyl, tub … |
+| `bin` | Shelf location, e.g. `A1-03` |
+| `cost` / `lt` | Unit cost in USD, supplier lead time in days |
+| `war` / `warFrom` | Warranty months (0 = none) and its start date |
+| `updated` | Managed by the app — leave blank |
+
+**Tools** — `id`, `code`, `name`, `cat`, `site`, `status`, `holder`, `outAt`,
+`dueAt`, `calInt`, `calLast`, `calNext`, `cert`, `war`, `warFrom`, `photo`,
+`cond`, `notes`
+
+| Column | Means |
+|---|---|
+| `code` | Asset code, e.g. `TL-001`, must be unique |
+| `cat` | Test & Measure, Mechanical, Safety, Comms, Lifting, Other |
+| `status` | `in`, `out` or `maint` |
+| `holder` / `dueAt` | Who has it and when it is due back, when status is `out` |
+| `calInt` | Calibration interval in months, 0 = not required |
+| `calLast` / `calNext` / `cert` | Last done, next due, certificate number |
+| `cond` | Good, Fair or Needs repair |
+
+**PurchaseOrders** — `id`, `no`, `sup`, `site`, `status`, `created`, `eta`,
+`by`, `notes`, `linesJSON`. Status is `draft`, `ordered`, `shipped`,
+`received` or `cancelled`. `linesJSON` holds the order lines as JSON, e.g.
+`[{"part":"p_ab12","qty":6,"cost":310}]` — easier to build in the app than by
+hand.
+
+**Sites** — `id`, `name`, `code`. Use the same short code for `id` and `code`.
+
+**ActivityLog** — `id`, `ts`, `type`, `by`, `site`, `part`, `qty`, `value`,
+`txt`. This is the audit trail; the app writes it. There is no reason to type
+into it by hand.
 
 ## Reading it automatically
 
