@@ -6204,6 +6204,59 @@ function resetLoginAttempts() {
 }
 
 /**
+ * Is this copy of the app meant to receive its accounts from a shared store?
+ *
+ * Written with typeof guards so the same function is safe in the multi-file
+ * build, which carries no cloud code at all.
+ */
+function cloudExpected() {
+  if (typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_CONFIG) return true;
+  return !!(window.claude && typeof window.claude.use === 'function');
+}
+
+/**
+ * Give the shared account list a chance to arrive before judging a username.
+ *
+ * A device that has not received it is not holding a wrong password -- it is
+ * holding an incomplete list. Only the accounts built into the file are there,
+ * so every account created since is missing, and saying "invalid credentials"
+ * blames the person for the network. This happens for real: a phone opening
+ * the file inside a chat app gets a sandboxed page that cannot reach the store
+ * at all.
+ *
+ * @param {number} [ms] how long to wait for the first snapshot
+ * @returns {Promise<string>} 'offline' when the store is unreachable, 'loading'
+ *   while still waiting, or '' when the local list is as complete as it gets
+ */
+async function awaitAccounts(ms) {
+  const arrived = () => typeof CLOUD_FIRST !== 'undefined' && !!CLOUD_FIRST.users;
+  const connected = () => typeof CLOUD !== 'undefined' && !!CLOUD;
+
+  if (!cloudExpected() || arrived()) return '';
+
+  const btn = $('#lkGo');
+  const label = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+  }
+
+  try {
+    const until = Date.now() + (ms || 6000);
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 150));
+      if (arrived()) return '';
+    }
+    return connected() ? 'loading' : 'offline';
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+}
+
+/**
  * Attempt login with username and password
  */
 async function doLogin() {
@@ -6232,7 +6285,24 @@ async function doLogin() {
     return;
   }
 
-  const acc = S.users.find((x) => x.u === u);
+  let acc = S.users.find((x) => x.u === u);
+
+  // Before treating an unknown name as wrong, make sure the account list is
+  // actually complete on this device. The wait costs nothing when it is.
+  if (!acc) {
+    const why = await awaitAccounts();
+    acc = S.users.find((x) => x.u === u);
+
+    if (!acc && why) {
+      showLoginError(
+        why === 'offline'
+          ? 'Not connected, so the shared accounts have not reached this device. ' +
+            'If you opened this file inside a chat app, save it first and open it in your browser.'
+          : 'Still loading accounts from the shared store — wait a moment and try again.'
+      );
+      return;
+    }
+  }
 
   // An unknown username must cost the same as a wrong password, or the delay
   // tells an attacker which usernames exist.
