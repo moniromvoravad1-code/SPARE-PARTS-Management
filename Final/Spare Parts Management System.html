@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Spare Parts Management System 3.0 - single-file build.
-       Generated from index.html; edit the source files, not this one. -->
+  <!-- Spare Parts Management System 3.1 — single-file build with live cloud sync.
+       Runs on the claude.ai viewer store, or on Firebase when hosted anywhere else. -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <meta name="theme-color" content="#0D1626">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>SPARE PARTS MANAGEMENT SYSTEM — Spare Parts &amp; Tools</title>
-  
+
   <!-- CSS Modules -->
   <style>
 /* ===== css/variables.css ===== */
@@ -23,53 +23,53 @@
   --surface: #fff;
   --surface2: #F6F9FC;
   --surface3: #EEF3F9;
-  
+
   /* Colors - Text */
   --ink: #0B1220;
   --ink2: #4A5A70;
   --ink3: #8695AA;
-  
+
   /* Colors - Borders & Dividers */
   --line: #DEE6EF;
   --line2: #CBD6E3;
-  
+
   /* Colors - Navigation Rail */
   --rail: #0D1626;
   --rail2: #16233A;
   --rail3: #233350;
   --railInk: #93A4BD;
-  
+
   /* Colors - Status */
   --brand: #0F766E;
   --brand2: #14958B;
   --brandSoft: #E2F4F1;
-  
+
   --ok: #12805C;
   --okSoft: #E3F5EC;
-  
+
   --low: #A55A08;
   --lowSoft: #FDF0DC;
-  
+
   --out: #B42318;
   --outSoft: #FCE9E7;
-  
+
   --ord: #1D4ED8;
   --ordSoft: #E8EEFE;
-  
+
   --mute: #64748B;
   --muteSoft: #EEF2F7;
-  
+
   /* Fonts */
   --mono: ui-monospace, SFMono-Regular, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  
+
   /* Spacing */
   --r: 10px;
-  
+
   /* Effects */
   --sh: 0 1px 2px rgba(11, 18, 32, 0.06), 0 1px 3px rgba(11, 18, 32, 0.04);
   --shL: 0 10px 30px rgba(11, 18, 32, 0.14);
-  
+
   /* Safe area insets (mobile) */
   --sat: env(safe-area-inset-top);
   --sab: env(safe-area-inset-bottom);
@@ -2263,7 +2263,7 @@ a {
   <!-- APP SHELL -->
   <div id="app">
     <div class="scrim" id="scrim"></div>
-    
+
     <aside class="rail" id="rail">
       <div class="rail-head">
         <div id="rlLogo" class="rail-mark">SNT</div>
@@ -2274,7 +2274,7 @@ a {
       </div>
       <nav class="nav" id="nav"></nav>
       <div class="rail-foot">
-        <span>Version 3.0</span>
+        <span>Version 3.1</span>
         <span id="syncDot">● offline</span>
       </div>
     </aside>
@@ -2408,18 +2408,18 @@ const CONSUMPTION_RATES = {
 /**
  * js/crypto.js - Password hashing
  *
- * Accounts are shared through the Google Sheet, so a password must never leave
+ * Accounts are shared through the cloud store, so a password must never leave
  * the device in a form anyone can read. Records carry PBKDF2-SHA-256 with a
  * per-account random salt.
  *
  * Be clear about what this buys: it protects against READING, not against
  * attacking. It keeps passwords off the screen, out of the backup file and out
- * of the sheet. Anyone who obtains the sheet still has salt and hash and can
- * grind offline as fast as their hardware allows - there is no server here to
- * withhold a secret or impose a rate limit. PBKDF2 makes each guess expensive;
- * it cannot rescue a weak password.
+ * of the shared store. Anyone who obtains the records still has salt and hash
+ * and can grind offline as fast as their hardware allows - there is no server
+ * here to withhold a secret or impose a rate limit. PBKDF2 makes each guess
+ * expensive; it cannot rescue a weak password.
  *
- * Values are hex, never base64: a Google Sheets cell whose text starts with
+ * Values are hex, never base64: a spreadsheet cell whose text starts with
  * + - = or @ is parsed as a formula, and hex can only ever start [0-9a-f].
  */
 
@@ -3188,7 +3188,10 @@ const storeLooksUsable = (o) => !!o &&
   Array.isArray(o.parts) && Array.isArray(o.tools);
 
 /**
- * Save state to storage.
+ * Save state to storage, then queue a push of the shared collections to the
+ * live cloud store (a no-op while a remote update is being applied, or when
+ * the cloud is unavailable).
+ *
  * @returns {Promise<boolean>} whether the store is actually safe on this device
  */
 async function saveState() {
@@ -3196,6 +3199,8 @@ async function saveState() {
 
   const r = await dbSet(LS_KEY, S);
   if (!r.ok) reportSaveFailure('Your changes could not be saved on this device', r);
+
+  cloudQueue();
 
   return r.ok;
 }
@@ -3287,6 +3292,367 @@ const siteName = (c) => {
   const s = S.sites.find((x) => x.id === c);
   return s ? s.name : c;
 };
+
+/* ===== js/cloud.js ===== */
+/**
+ * js/cloud.js - Live shared store, replacing the Google Sheets sync.
+ *
+ * When this page runs inside the claude.ai viewer, `claude.use('db')` resolves
+ * a realtime document store shared by everyone who has this artifact open.
+ * Every shared collection (sites, parts, tools, orders, accounts, activity) is
+ * mirrored there, one document per record, and every device subscribes to
+ * changes — so an issue booked on one phone appears on every other screen
+ * within seconds.
+ *
+ * Design rules:
+ *   - The device copy (localStorage / IndexedDB) stays the offline cache; the
+ *     cloud is the shared truth once connected.
+ *   - The first device ever to connect seeds the cloud from its local store.
+ *     After that, snapshots from the cloud are adopted as they arrive.
+ *   - Pushes are diffs: only records that changed are written, so two people
+ *     editing different parts at the same time do not overwrite each other.
+ *   - Passwords travel only as PBKDF2 salt + hash (pwSet strips cleartext).
+ *   - Uploaded photos ride along as their own collection, one document per
+ *     photo, so a picture added on one device shows on all of them.
+ */
+
+/**
+ * Firebase project config — lets the live sync work from ANY web host, with no
+ * Claude sign-in. Paste the web-app config object from the Firebase console
+ * (Project settings → Your apps → Web app). This is public client config, not
+ * a secret. Leave as null to disable the Firebase path.
+ */
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyDtjePyZGMSW_cNPmcK4D5_ZyG0qlHaWWM',
+  authDomain: 'snt-spare-parts.firebaseapp.com',
+  projectId: 'snt-spare-parts',
+  storageBucket: 'snt-spare-parts.firebasestorage.app',
+  messagingSenderId: '880412247497',
+  appId: '1:880412247497:web:8ca97108376bde27325418',
+  measurementId: 'G-EKTGK05SE5'
+};
+
+/** Load one external script and resolve when it is ready. */
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = () => rej(new Error('could not load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+/**
+ * Bring up Cloud Firestore via its compat CDN build. The compat API matches
+ * the claude.ai db namespace exactly for everything this app calls:
+ * collection().onSnapshot / limit().get, doc('col/id').set / .delete.
+ */
+async function initFirebase() {
+  const V = '10.12.4';
+  await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js`);
+  await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js`);
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  return firebase.firestore();
+}
+
+let CLOUD = null;                 // db namespace, or null when unavailable
+let CLOUD_LIVE = false;           // at least one snapshot has been processed
+let CLOUD_APPLYING = false;       // a remote snapshot is being adopted
+let CLOUD_TIMER = null;           // debounce for pushes
+let CLOUD_RENDER_TIMER = null;    // debounce for repaints
+let CLOUD_PENDING_RENDER = false; // a repaint is waiting for a modal to close
+let CLOUD_LAST = {};              // col -> { docId: json } last known cloud state
+let CLOUD_FIRST = {};             // col -> true once the first snapshot arrived
+
+/** The shared collections, and how they map onto the app state. */
+/**
+ * Biggest document either store will take. Firestore allows 1 MiB and the
+ * claude.ai store 256 KiB, so the tighter one is the rule, less a little room
+ * for the JSON the field names add.
+ */
+const CLOUD_DOC_MAX = 240 * 1024;
+
+const CLOUD_COLS = [
+  { col: 'sites', key: 'id', get: () => S.sites, set: (v) => { S.sites = v; } },
+  { col: 'parts', key: 'id', get: () => S.parts, set: (v) => { S.parts = v; } },
+  { col: 'tools', key: 'id', get: () => S.tools, set: (v) => { S.tools = v; } },
+  { col: 'pos',   key: 'id', get: () => S.pos,   set: (v) => { S.pos = v; } },
+  { col: 'users', key: 'u',  get: () => S.users, set: (v) => { S.users = v; } },
+  {
+    col: 'log', key: 'id',
+    get: () => S.log.slice(0, 300),
+    set: (v) => { S.log = v.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)); }
+  },
+  {
+    // Uploaded photos. A part record only ever carries the short key, so
+    // without this the key syncs and the picture does not - every other device
+    // looks up an id it has no bytes for and silently shows a blank tile.
+    //
+    // The bytes deliberately do NOT go inside the part record: saveState
+    // mirrors the whole of S into localStorage, and a store full of photos
+    // would blow its ~5 MB quota on every save. One document per photo keeps
+    // them out of S, and at ~67 KB each sits well inside both the Firestore
+    // 1 MiB and the claude.ai 256 KiB per-document ceilings.
+    col: 'photos', key: 'id',
+    photos: true,
+    get: () => Object.keys(PH).map((id) => ({ id, data: PH[id] })),
+    set: (v) => {
+      const next = {};
+      v.forEach((d) => {
+        if (d && d.id && typeof d.data === 'string') next[d.id] = d.data;
+      });
+      PH = next;
+    }
+  }
+];
+
+/** Read a snapshot document defensively (data may be a method or a property). */
+function cloudDocData(d) {
+  try {
+    return typeof d.data === 'function' ? d.data() : d.data;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Connect, decide seed-vs-adopt, and subscribe every collection.
+ * Never blocks start-up: the app works from its device copy until this lands.
+ */
+async function initCloud() {
+  // 1) The claude.ai viewer's shared store, when the page runs there
+  if (window.claude && typeof window.claude.use === 'function') {
+    try {
+      CLOUD = await window.claude.use('db');
+    } catch (e) {
+      CLOUD = null;
+    }
+  }
+
+  // 2) Firebase, when the page is hosted on an ordinary website
+  if (!CLOUD && FIREBASE_CONFIG) {
+    try {
+      CLOUD = await initFirebase();
+    } catch (e) {
+      console.warn('Firebase unavailable:', e && e.message);
+      CLOUD = null;
+    }
+  }
+
+  if (!CLOUD) return;
+
+  setSync('● connecting…', '#C2740D');
+
+  // Seed decision: if the cloud has never held any parts, this device's copy
+  // becomes the shared starting point.
+  let remoteHasData = false;
+  try {
+    const probe = await CLOUD.collection('parts').limit(1).get();
+    remoteHasData = !!(probe && probe.docs && probe.docs.length);
+  } catch (e) {
+    // If a one-shot read is not available, the first snapshot decides instead.
+    remoteHasData = null;
+  }
+
+  if (remoteHasData === false) {
+    try {
+      await cloudPushAll();
+      console.log('✓ cloud store seeded from this device');
+    } catch (e) {
+      console.warn('cloud seed failed', e);
+    }
+  }
+
+  CLOUD_COLS.forEach(cloudSubscribe);
+  CLOUD_LIVE = true;
+  setSync('● live', '#8FE3C8');
+}
+
+/** Subscribe one collection and adopt every snapshot that arrives. */
+function cloudSubscribe(c) {
+  try {
+    CLOUD.collection(c.col).onSnapshot((snap) => {
+      try {
+        cloudAdopt(c, snap);
+      } catch (e) {
+        console.warn('cloud adopt failed for', c.col, e);
+      }
+    });
+  } catch (e) {
+    console.warn('cloud subscribe failed for', c.col, e);
+  }
+}
+
+/** Apply one collection snapshot to the local state. */
+function cloudAdopt(c, snap) {
+  const items = [];
+  const seen = {};
+
+  (snap && snap.docs ? snap.docs : []).forEach((d) => {
+    const v = cloudDocData(d);
+    if (v && typeof v === 'object') {
+      items.push(v);
+      seen[String(d.id)] = JSON.stringify(v);
+    }
+  });
+
+  const first = !CLOUD_FIRST[c.col];
+  CLOUD_FIRST[c.col] = true;
+
+  // An empty first snapshot while this device has data means the cloud is
+  // still blank (or the one-shot probe was unavailable): seed it, do not
+  // adopt the emptiness.
+  if (first && !items.length && c.get().length) {
+    CLOUD_LAST[c.col] = {};
+    cloudQueue();
+    return;
+  }
+
+  // Identical to what we already hold? Record it and stop.
+  const localSeen = {};
+  c.get().forEach((o) => {
+    const id = String(o[c.key]);
+    if (id) localSeen[id] = JSON.stringify(o);
+  });
+  CLOUD_LAST[c.col] = seen;
+
+  const same = Object.keys(seen).length === Object.keys(localSeen).length &&
+    Object.keys(seen).every((k) => localSeen[k] === seen[k]);
+  if (same) return;
+
+  CLOUD_APPLYING = true;
+  try {
+    if (c.col === 'sites') items.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    c.set(items);
+
+    if (c.col === 'users') {
+      ensureSignInPossible();
+      if (VIEW.user) {
+        const me = S.users.find((u) => u.u === VIEW.user.u);
+        if (!me || me.active === 0) {
+          CLOUD_APPLYING = false;
+          signOut();
+          toast('Your account was changed on another device — please sign in again', 'bad');
+          return;
+        }
+        VIEW.user = me;
+      }
+    }
+
+    // Keep the device cache in step (never pushes back: CLOUD_APPLYING is set).
+    // Photos live under their own key and must never be folded into S, or the
+    // localStorage mirror inside dbSet would blow its quota.
+    if (c.photos) dbSet(PH_KEY, PH, { mirror: !STORE.idb });
+    else dbSet(LS_KEY, S);
+  } finally {
+    CLOUD_APPLYING = false;
+  }
+
+  cloudRepaint();
+}
+
+/** Repaint after remote changes — deferred while a modal or menu is open. */
+function cloudRepaint() {
+  if (!VIEW.user) return;
+
+  clearTimeout(CLOUD_RENDER_TIMER);
+  CLOUD_RENDER_TIMER = setTimeout(() => {
+    const busy = hasClass($('#mask'), 'on') || hasClass($('#menu'), 'on');
+    if (busy) {
+      CLOUD_PENDING_RENDER = true;
+      return;
+    }
+
+    const q = $('#q');
+    const hadFocus = q && document.activeElement === q;
+
+    buildSites();
+    buildNav();
+    render();
+
+    if (hadFocus) {
+      const nq = $('#q');
+      if (nq) {
+        nq.focus();
+        nq.setSelectionRange(nq.value.length, nq.value.length);
+      }
+    }
+  }, 180);
+}
+
+/** Queue a diff push of every shared collection (debounced). */
+function cloudQueue() {
+  if (!CLOUD || CLOUD_APPLYING) return;
+
+  clearTimeout(CLOUD_TIMER);
+  CLOUD_TIMER = setTimeout(() => {
+    cloudPushDirty().catch((e) => {
+      console.warn('cloud push failed', e);
+      setSync('● sync failed', '#FF9A92');
+    });
+  }, 400);
+}
+
+/** Write only the records that differ from the last known cloud state. */
+async function cloudPushDirty() {
+  if (!CLOUD) return;
+
+  let wrote = 0;
+  const oversized = [];
+
+  for (const c of CLOUD_COLS) {
+    const last = CLOUD_LAST[c.col] || {};
+    const next = {};
+
+    for (const o of c.get()) {
+      const id = String(o[c.key] || '');
+      if (!id) continue;
+      next[id] = JSON.stringify(o);
+    }
+
+    for (const id of Object.keys(next)) {
+      if (last[id] === next[id]) continue;
+
+      // Both stores cap a single document; the claude.ai one is the tighter at
+      // 256 KiB. Skip an oversized record by name rather than letting the write
+      // reject and abandon every collection after this one.
+      if (next[id].length > CLOUD_DOC_MAX) {
+        console.warn(`cloud: ${c.col}/${id} is ${Math.round(next[id].length / 1024)} KB, over the ${Math.round(CLOUD_DOC_MAX / 1024)} KB limit — not synced`);
+        oversized.push(c.col + '/' + id);
+        last[id] = next[id];   // do not retry it on every later save
+        continue;
+      }
+
+      await CLOUD.doc(c.col + '/' + id).set(JSON.parse(next[id]));
+      wrote++;
+    }
+
+    for (const id of Object.keys(last)) {
+      if (!(id in next)) {
+        try { await CLOUD.doc(c.col + '/' + id).delete(); } catch (e) { /* gone already */ }
+        wrote++;
+      }
+    }
+
+    CLOUD_LAST[c.col] = next;
+  }
+
+  if (oversized.length) {
+    toast(`${oversized.length} item${oversized.length === 1 ? '' : 's'} too large to share — try a smaller photo or a link`, 'bad');
+  }
+
+  if (wrote && CLOUD_LIVE) {
+    setSync('● live · saved ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), '#8FE3C8');
+  }
+}
+
+/** Push everything, used once to seed an empty cloud store. */
+async function cloudPushAll() {
+  CLOUD_LAST = {};
+  await cloudPushDirty();
+}
 
 /* ===== js/roles.js ===== */
 /**
@@ -3524,15 +3890,15 @@ let SESSION_DATA = {
  */
 function initSessionTracking() {
   if (!SESSION_CONFIG.enableTracking || !VIEW.user) return;
-  
+
   SESSION_DATA.startTime = Date.now();
   SESSION_DATA.lastActivityTime = Date.now();
   SESSION_DATA.warningShown = false;
   SESSION_DATA.trackingEvents = [];
-  
+
   // Track user activity
   setupActivityTracking();
-  
+
   // Log session start
   logIt('session_start', `Session started for ${VIEW.user.name}`, 'all', {
     user: VIEW.user.u,
@@ -3550,13 +3916,13 @@ function setupActivityTracking() {
     SESSION_DATA.warningShown = false;
     resetInactivityTimers();
   };
-  
+
   // Events that count as activity
   document.addEventListener('click', trackActivity);
   document.addEventListener('keydown', trackActivity);
   document.addEventListener('mousemove', trackActivity);
   document.addEventListener('scroll', trackActivity);
-  
+
   // Start inactivity timers
   resetInactivityTimers();
 }
@@ -3566,11 +3932,11 @@ function setupActivityTracking() {
  */
 function resetInactivityTimers() {
   if (!VIEW.user) return;
-  
+
   // Clear existing timers
   if (SESSION_DATA.inactivityTimer) clearTimeout(SESSION_DATA.inactivityTimer);
   if (SESSION_DATA.warningTimer) clearTimeout(SESSION_DATA.warningTimer);
-  
+
   // Warning timer
   SESSION_DATA.warningTimer = setTimeout(() => {
     if (!SESSION_DATA.warningShown && VIEW.user) {
@@ -3578,7 +3944,7 @@ function resetInactivityTimers() {
       showSessionWarning();
     }
   }, SESSION_CONFIG.inactivityTimeout - SESSION_CONFIG.warningTime);
-  
+
   // Timeout timer
   SESSION_DATA.inactivityTimer = setTimeout(() => {
     if (VIEW.user) {
@@ -3597,9 +3963,9 @@ function resetInactivityTimers() {
  */
 function showSessionWarning() {
   const remaining = Math.ceil(SESSION_CONFIG.warningTime / 1000);
-  
+
   toast(`Session will expire in ${remaining} seconds. Click to stay logged in.`, 'bad');
-  
+
   // Make toast clickable to reset timer
   const toastEl = $('#toast');
   toastEl.style.cursor = 'pointer';
@@ -3634,7 +4000,7 @@ function formatSessionDuration(ms) {
   const hours = Math.floor(ms / (1000 * 60 * 60));
   const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   } else if (minutes > 0) {
@@ -3649,7 +4015,7 @@ function formatSessionDuration(ms) {
  */
 function getSessionInfo() {
   if (!VIEW.user) return null;
-  
+
   return {
     user: VIEW.user.name,
     role: VIEW.user.role,
@@ -3667,19 +4033,19 @@ function getSessionInfo() {
  */
 function endSession() {
   if (!VIEW.user) return;
-  
+
   const duration = getSessionDuration();
-  
+
   logIt('session_end', `Session ended for ${VIEW.user.name}`, 'all', {
     user: VIEW.user.u,
     duration: duration,
     durationFormatted: formatSessionDuration(duration)
   });
-  
+
   // Clear timers
   if (SESSION_DATA.inactivityTimer) clearTimeout(SESSION_DATA.inactivityTimer);
   if (SESSION_DATA.warningTimer) clearTimeout(SESSION_DATA.warningTimer);
-  
+
   SESSION_DATA = {
     startTime: null,
     lastActivityTime: null,
@@ -3695,9 +4061,9 @@ function endSession() {
  */
 function showSessionInfo() {
   if (!VIEW.user) return;
-  
+
   const info = getSessionInfo();
-  
+
   openModal(
     'Session Information',
     `${info.user} · ${info.role}`,
@@ -3845,19 +4211,19 @@ const stockIn = (f, t) => flow('receive', f, t);
  */
 function flowPrev(type, kind) {
   const now = Date.now();
-  
+
   if (kind === 'week') {
     const w = +weekStart();
     return flow(type, w - 7 * DAY, w - 7 * DAY + (now - w));
   }
-  
+
   if (kind === 'month') {
     const m = monthStart();
     const el = now - m;
     const pm = new Date(m.getFullYear(), m.getMonth() - 1, 1);
     return flow(type, pm, +pm + el);
   }
-  
+
   const y = yearStart();
   const el = now - y;
   const py = new Date(y.getFullYear() - 1, 0, 1);
@@ -3872,13 +4238,13 @@ const usePrev = (k) => flowPrev('issue', k);
 function byMonth(n) {
   const out = [];
   const d = today();
-  
+
   for (let i = n - 1; i >= 0; i--) {
     const s = new Date(d.getFullYear(), d.getMonth() - i, 1);
     const e = new Date(d.getFullYear(), d.getMonth() - i + 1, 1);
     const o = use(s, e);
     const inn = stockIn(s, e);
-    
+
     out.push({
       label: MON[s.getMonth()],
       year: s.getFullYear(),
@@ -3889,7 +4255,7 @@ function byMonth(n) {
       now: i === 0
     });
   }
-  
+
   return out;
 }
 
@@ -3900,13 +4266,13 @@ const useByMonth = (n) => byMonth(n);
  */
 function topUsed(from, limit) {
   const m = {};
-  
+
   use(from).lines.forEach((l) => {
     if (!m[l.part]) m[l.part] = { qty: 0, val: 0 };
     m[l.part].qty += l.qty;
     m[l.part].val += l.value || 0;
   });
-  
+
   return Object.entries(m)
     .map(([id, v]) => ({ p: partById(id), ...v }))
     .filter((x) => x.p)
@@ -3986,10 +4352,10 @@ const warExpired = () => warItems().filter((x) => x.st === 'exp');
 function formatWarranty(o) {
   const state = warState(o);
   if (state === 'none') return 'No warranty';
-  
+
   const until = warUntil(o);
   const days = daysTo(until);
-  
+
   if (state === 'exp') return `Expired ${Math.abs(days)} days ago`;
   if (state === 'soon') return `Expires in ${days} days`;
   return `Valid for ${days} more days`;
@@ -4059,17 +4425,17 @@ function createPart(sku, name, cat, site, qty, min, unit, bin, cost, sup, lt) {
 function issuePart(partId, qty, site) {
   const p = partById(partId);
   if (!p) return false;
-  
+
   p.qty = Math.max(0, p.qty - qty);
   p.updated = Date.now();
-  
+
   const value = qty * p.cost;
   logIt('issue', `Issued ${qty} × ${p.name}`, site, {
     part: partId,
     qty,
     value
   });
-  
+
   return true;
 }
 
@@ -4079,17 +4445,17 @@ function issuePart(partId, qty, site) {
 function receivePart(partId, qty, site) {
   const p = partById(partId);
   if (!p) return false;
-  
+
   p.qty += qty;
   p.updated = Date.now();
-  
+
   const value = qty * p.cost;
   logIt('receive', `Received ${qty} × ${p.name}`, site, {
     part: partId,
     qty,
     value
   });
-  
+
   return true;
 }
 
@@ -4099,11 +4465,11 @@ function receivePart(partId, qty, site) {
 function adjustPart(partId, newQty, reason) {
   const p = partById(partId);
   if (!p) return false;
-  
+
   const delta = newQty - p.qty;
   p.qty = newQty;
   p.updated = Date.now();
-  
+
   logIt('adjust', `Stock adjustment: ${p.name} → ${newQty} (${reason})`, p.site);
   return true;
 }
@@ -4114,7 +4480,7 @@ function adjustPart(partId, newQty, reason) {
 function deletePart(partId) {
   const p = partById(partId);
   if (!p) return false;
-  
+
   const idx = S.parts.indexOf(p);
   if (idx >= 0) {
     S.parts.splice(idx, 1);
@@ -4167,12 +4533,12 @@ const calDue = () => S.tools.filter((t) => inSite(t) && ['due', 'exp'].includes(
 function checkoutTool(toolId, holder, dueDate, site) {
   const t = S.tools.find((x) => x.id === toolId);
   if (!t) return false;
-  
+
   t.status = 'out';
   t.holder = holder;
   t.outAt = Date.now();
   t.dueAt = dueDate;
-  
+
   logIt('checkout', `Checked out ${t.name} — ${holder}`, site, { tool: toolId });
   return true;
 }
@@ -4183,12 +4549,12 @@ function checkoutTool(toolId, holder, dueDate, site) {
 function returnTool(toolId, site) {
   const t = S.tools.find((x) => x.id === toolId);
   if (!t) return false;
-  
+
   t.status = 'in';
   t.holder = '';
   t.outAt = null;
   t.dueAt = null;
-  
+
   logIt('return', `Returned ${t.name}`, site, { tool: toolId });
   return true;
 }
@@ -4199,11 +4565,11 @@ function returnTool(toolId, site) {
 function calibrateTool(toolId, lastDate, nextDate, cert, site) {
   const t = S.tools.find((x) => x.id === toolId);
   if (!t) return false;
-  
+
   t.calLast = lastDate;
   t.calNext = nextDate;
   t.cert = cert;
-  
+
   logIt('calibration', `Calibrated ${t.name} (Cert: ${cert})`, site, { tool: toolId });
   return true;
 }
@@ -4251,10 +4617,10 @@ function createPO(supplier, site, lines, notes) {
     notes,
     lines: lines || []
   };
-  
+
   S.pos.push(po);
   logIt('po', `Created ${po.no} — ${supplier}, ${lines.length} line(s)`, site, { po: po.id });
-  
+
   return po;
 }
 
@@ -4264,11 +4630,11 @@ function createPO(supplier, site, lines, notes) {
 function updatePOStatus(poId, newStatus, eta) {
   const po = poById(poId);
   if (!po) return false;
-  
+
   const oldStatus = po.status;
   po.status = newStatus;
   if (eta) po.eta = eta;
-  
+
   logIt('po', `Updated ${po.no}: ${oldStatus} → ${newStatus}`, po.site, { po: poId });
   return true;
 }
@@ -4279,13 +4645,13 @@ function updatePOStatus(poId, newStatus, eta) {
 function addPOLine(poId, partId, qty, cost) {
   const po = poById(poId);
   if (!po) return false;
-  
+
   po.lines.push({
     part: partId,
     qty,
     cost
   });
-  
+
   return true;
 }
 
@@ -4295,7 +4661,7 @@ function addPOLine(poId, partId, qty, cost) {
 function removePOLine(poId, lineIndex) {
   const po = poById(poId);
   if (!po || lineIndex < 0 || lineIndex >= po.lines.length) return false;
-  
+
   po.lines.splice(lineIndex, 1);
   return true;
 }
@@ -4319,7 +4685,7 @@ function poTotal(po) {
  */
 function approvePO(poId) {
   if (!can('poApprove')) return false;
-  
+
   return updatePOStatus(poId, 'ordered');
 }
 
@@ -4329,15 +4695,15 @@ function approvePO(poId) {
 function receivePO(poId) {
   const po = poById(poId);
   if (!po || po.status !== 'shipped') return false;
-  
+
   // Receive each line item
   po.lines.forEach((line) => {
     receivePart(line.part, line.qty, po.site);
   });
-  
+
   updatePOStatus(poId, 'received');
   logIt('receive', `Received ${po.no} from ${po.sup}`, po.site, { po: poId });
-  
+
   return true;
 }
 
@@ -4632,7 +4998,7 @@ function toast(msg, kind) {
   const t = $('#toast');
   t.textContent = msg;
   t.className = 'toast on' + (kind ? ' ' + kind : '');
-  
+
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => {
     t.className = 'toast';
@@ -4652,12 +5018,22 @@ const showToast = {
  */
 
 /**
- * Close the current modal
+ * Close the current modal. A repaint deferred while the modal was open (a
+ * change that arrived from another device) runs now.
  */
 function closeModal() {
   $('#mask').classList.remove('on');
   $('#modal').classList.remove('wide');
   $('#modal').innerHTML = '';
+
+  if (CLOUD_PENDING_RENDER) {
+    CLOUD_PENDING_RENDER = false;
+    if (VIEW.user) {
+      buildSites();
+      buildNav();
+      render();
+    }
+  }
 }
 
 /**
@@ -4682,7 +5058,7 @@ function openModal(title, sub, body, footer, wide) {
   $('#modal').innerHTML = modalHtml;
   $('#modal').classList.toggle('wide', !!wide);
   $('#mask').classList.add('on');
-  
+
   // Auto-focus first input (desktop only)
   const f = $('#modal').querySelector('input:not([type=file]),select,textarea');
   if (f && window.innerWidth > 860) {
@@ -4743,20 +5119,20 @@ function openMenu(anchor, html) {
   const m = $('#menu');
   m.innerHTML = html;
   m.classList.add('on');
-  
+
   // Position menu relative to anchor
   const r = anchor.getBoundingClientRect();
   const w = m.offsetWidth;
   const h = m.offsetHeight;
-  
+
   let l = Math.min(r.left, window.innerWidth - w - 10);
   let t = r.bottom + 6;
-  
+
   // If menu goes off bottom, show above instead
   if (t + h > window.innerHeight - 10) {
     t = Math.max(10, r.top - h - 6);
   }
-  
+
   m.style.left = Math.max(10, l) + 'px';
   m.style.top = t + 'px';
 }
@@ -4806,10 +5182,10 @@ let PH = {}; // Photo storage
  */
 function photoSrc(o) {
   if (!o || !o.photo) return null;
-  
+
   // External URL
   if (/^https?:\/\//i.test(o.photo)) return o.photo;
-  
+
   // Local storage data URI
   return PH[o.photo] || null;
 }
@@ -4825,6 +5201,10 @@ function photoSrc(o) {
 async function savePhotos() {
   const r = await dbSet(PH_KEY, PH, { mirror: !STORE.idb });
   if (!r.ok) reportSaveFailure('That photo could not be saved on this device', r);
+
+  // saveState queues a push for everything in S; photos are kept apart from S,
+  // so without this a new picture would never leave the device.
+  cloudQueue();
 
   return r.ok;
 }
@@ -4847,7 +5227,7 @@ function shrinkImage(file) {
     if (!/^image\//.test(file.type)) {
       return rej(new Error('That file is not an image'));
     }
-    
+
     const r = new FileReader();
     r.onerror = () => rej(new Error('Could not read that file'));
     r.onload = (e) => {
@@ -4861,7 +5241,7 @@ function shrinkImage(file) {
           const sc = Math.min(1, PH_MAX / Math.max(w, h));
           w = Math.max(1, Math.round(w * sc));
           h = Math.max(1, Math.round(h * sc));
-          
+
           // Draw to canvas
           const c = document.createElement('canvas');
           c.width = w;
@@ -4870,7 +5250,7 @@ function shrinkImage(file) {
           x.fillStyle = '#fff';
           x.fillRect(0, 0, w, h);
           x.drawImage(img, 0, 0, w, h);
-          
+
           // Return compressed JPEG
           res(c.toDataURL('image/jpeg', PH_Q));
         } catch (err) {
@@ -4892,7 +5272,7 @@ function shrinkImage(file) {
 function thumb(o, fallback, cls) {
   const src = photoSrc(o);
   const classes = 'th ' + (cls || '');
-  
+
   if (src) {
     return `
       <img class="${classes}" src="${esc(src)}" alt="" loading="lazy"
@@ -4900,7 +5280,7 @@ function thumb(o, fallback, cls) {
         onerror="this.outerHTML='<div class=\\'th ph0 ${cls||''}\\'>?</div>'">
     `;
   }
-  
+
   return `<div class="th ph0 ${cls || ''}">${esc((fallback || '—').slice(0, 2).toUpperCase())}</div>`;
 }
 
@@ -4910,11 +5290,11 @@ function thumb(o, fallback, cls) {
 function viewPhoto(id) {
   const o = anyById(id);
   const src = photoSrc(o);
-  
+
   if (!src) {
     return toast('No photo on this item yet');
   }
-  
+
   openModal(
     o.name,
     o.sku || o.code,
@@ -5092,7 +5472,7 @@ function sbar(p) {
   const span = Math.max(p.min * 2, p.qty, 1);
   const w = Math.min(100, (p.qty / span) * 100);
   const mk = Math.min(100, (p.min / span) * 100);
-  
+
   return `
     <div class="sb ${st === 'ok' ? '' : st}">
       <i style="width:${w}%"></i>
@@ -5380,7 +5760,7 @@ function isAccountLocked() {
 function recordFailedAttempt() {
   AUTH_STATE.loginAttempts++;
   AUTH_STATE.lastAttemptTime = Date.now();
-  
+
   // Lock account after max attempts
   if (AUTH_STATE.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
     AUTH_STATE.lockoutTime = Date.now() + LOCKOUT_DURATION;
@@ -5390,7 +5770,7 @@ function recordFailedAttempt() {
       msg: 'Too many failed attempts. Account locked for 5 minutes.'
     };
   }
-  
+
   return {
     failed: true,
     locked: false,
@@ -5418,25 +5798,25 @@ async function doLogin() {
     showLoginError(`Account locked. Try again in ${lockCheck.remaining} seconds.`);
     return;
   }
-  
+
   // Get and validate input
   const u = $('#lkUser').value.trim().toLowerCase();
   const p = $('#lkPass').value;
   const rememberMe = $('#lkRemember') && $('#lkRemember').checked;
-  
+
   // Validate input format
   const userVal = validateUsername(u);
   if (!userVal.valid) {
     showLoginError(userVal.msg);
     return;
   }
-  
+
   const passVal = validatePassword(p);
   if (!passVal.valid) {
     showLoginError(passVal.msg);
     return;
   }
-  
+
   const acc = S.users.find((x) => x.u === u);
 
   // An unknown username must cost the same as a wrong password, or the delay
@@ -5473,21 +5853,21 @@ async function doLogin() {
 
   // Clear error
   hideLoginError();
-  
+
   // Clear inputs
   $('#lkPass').value = '';
   $('#lkUser').value = '';
-  
+
   // Reset attempt counter
   resetLoginAttempts();
-  
+
   // Log successful login
   logIt('login', `User logged in: ${acc.name} (${acc.role})`, 'all', {
     user: acc.u,
     role: acc.role,
     site: acc.site
   });
-  
+
   // Enter application
   enter(acc, rememberMe);
 }
@@ -5517,9 +5897,9 @@ function startSessionTimeout() {
   if (AUTH_STATE.sessionTimeout) {
     clearTimeout(AUTH_STATE.sessionTimeout);
   }
-  
+
   AUTH_STATE.lastActivityTime = Date.now();
-  
+
   AUTH_STATE.sessionTimeout = setTimeout(() => {
     if (VIEW.user) {
       logIt('session_timeout', 'Session timed out due to inactivity', 'all');
@@ -5533,7 +5913,7 @@ function startSessionTimeout() {
  */
 function resetInactivityTimer() {
   if (!VIEW.user) return; // Not logged in
-  
+
   const now = Date.now();
   if (now - AUTH_STATE.lastActivityTime > 60000) { // Only reset if > 1 minute since last activity
     AUTH_STATE.lastActivityTime = now;
@@ -5563,18 +5943,18 @@ function enter(acc, rememberMe = false) {
   const ids = siteIdsFor(acc);
   VIEW.site = ids.length === 1 ? ids[0] : 'all';
   VIEW.page = landingPage();
-  
+
   // Store session info
   S.session = {
     u: acc.u,
     at: Date.now(),
     rememberMe: rememberMe
   };
-  
+
   // Update UI
   $('#lock').classList.add('gone');
   $('#app').classList.add('on');
-  
+
   // Set user badge
   const initials = acc.name
     .split(' ')
@@ -5584,22 +5964,22 @@ function enter(acc, rememberMe = false) {
     .toUpperCase();
   $('#meBtn').textContent = initials;
   $('#meBtn').title = acc.name;
-  
+
   // Build navigation
   buildSites();
   buildNav();
   render();
-  
+
   // Save state with remember-me
   if (rememberMe) {
     S.session.rememberMe = true;
     lsSet(REMEMBER_KEY, 'true');
   }
   saveState();
-  
+
   // Initialize session tracking
   initSessionTracking();
-  
+
   toast(`Welcome, ${acc.name}!`, 'good');
 }
 
@@ -5610,18 +5990,18 @@ function signOut() {
   if (VIEW.user) {
     // End session tracking
     endSession();
-    
+
     // Log sign out
     logIt('logout', `User logged out: ${VIEW.user.name}`, 'all', {
       user: VIEW.user.u,
       duration: Date.now() - S.session.at
     });
   }
-  
+
   // Close any open modals/menus
   closeMenu();
   closeModal();
-  
+
   // Clear session
   VIEW.user = null;
   S.session = null;
@@ -5633,20 +6013,20 @@ function signOut() {
   // Update UI
   $('#app').classList.remove('on');
   $('#lock').classList.remove('gone');
-  
+
   // Update clock
   tick();
-  
+
   // Clear inputs
   $('#lkUser').value = '';
   $('#lkPass').value = '';
   hideLoginError();
-  
+
   // Focus on username field
   setTimeout(() => {
     $('#lkUser').focus();
   }, 300);
-  
+
   toast('You have been signed out', 'info');
 }
 
@@ -5679,17 +6059,17 @@ function pwModal() {
       <button class="btn pri" onclick="changePassword()">Update Password</button>
     `
   );
-  
+
   // Focus first field
   setTimeout(() => $('#pwCur').focus(), 100);
-  
+
   // Allow Enter to submit
   const handleEnter = (e) => {
     if (e.key === 'Enter') {
       changePassword();
     }
   };
-  
+
   $('#pwCur').addEventListener('keydown', handleEnter);
   $('#pwNew').addEventListener('keydown', handleEnter);
   $('#pwCon').addEventListener('keydown', handleEnter);
@@ -5701,16 +6081,16 @@ function pwModal() {
 function validateNewPassword(p) {
   if (!p) return { valid: false, msg: 'Password is required' };
   if (p.length < 6) return { valid: false, msg: 'Password must be at least 6 characters' };
-  
+
   // Optional: check for complexity
   const hasUpper = /[A-Z]/.test(p);
   const hasLower = /[a-z]/.test(p);
   const hasNum = /[0-9]/.test(p);
-  
+
   if (!(hasUpper && hasLower && hasNum)) {
     console.warn('Weak password: mix of uppercase, lowercase, and numbers recommended');
   }
-  
+
   return { valid: true };
 }
 
@@ -5737,21 +6117,21 @@ async function changePassword() {
     $('#pwNew').focus();
     return;
   }
-  
+
   // Check passwords match
   if (neu !== con) {
     toast('New passwords do not match', 'bad');
     $('#pwCon').focus();
     return;
   }
-  
+
   // Check new password is different from old
   if (neu === cur) {
     toast('New password must be different from current password', 'bad');
     $('#pwNew').focus();
     return;
   }
-  
+
   // Update password. VIEW.user is the same object as the S.users entry, so
   // this updates both.
   const user = S.users.find((x) => x.u === VIEW.user.u);
@@ -5763,7 +6143,7 @@ async function changePassword() {
     logIt('password_changed', `User changed password: ${VIEW.user.name}`, 'all', {
       user: VIEW.user.u
     });
-    
+
     closeModal();
     toast('Password updated successfully', 'good');
   }
@@ -5811,8 +6191,8 @@ function resetDevice() {
     </p>
     <p style="font-size:13px;color:var(--ink2);margin:0">
       Accounts, stock, tools, orders and history saved on this device are
-      removed. Anything already written to your Google Sheet is not affected and
-      comes back on the next sync. Other people's devices are untouched.
+      removed. Anything already in the shared cloud store is not affected and
+      comes back on the next open. Other people's devices are untouched.
     </p>
   `, `
     <button class="btn" onclick="closeModal()">Cancel</button>
@@ -5834,10 +6214,10 @@ async function doResetDevice() {
 function initAuth() {
   // Update clock
   tick();
-  
+
   // Login button
   $('#lkGo').onclick = doLogin;
-  
+
   // Password show/hide toggle
   $('#lkEye').onclick = () => {
     const i = $('#lkPass');
@@ -5845,16 +6225,16 @@ function initAuth() {
     i.type = s ? 'text' : 'password';
     $('#lkEye').textContent = s ? 'Hide' : 'Show';
   };
-  
+
   // Keyboard navigation
   $('#lkUser').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') $('#lkPass').focus();
   });
-  
+
   $('#lkPass').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   });
-  
+
   lockHint();
 
   // Check for remembered session
@@ -5887,10 +6267,10 @@ function go(p) {
   VIEW.stock = 'all';
   VIEW.tab = 'all';
   VIEW.sel = [];
-  
+
   $('#rail').classList.remove('on');
   $('#scrim').classList.remove('on');
-  
+
   buildNav();
   render();
   window.scrollTo(0, 0);
@@ -5908,10 +6288,10 @@ function goLog(type) {
   VIEW.stock = 'all';
   VIEW.tab = type || 'all';
   VIEW.sel = [];
-  
+
   $('#rail').classList.remove('on');
   $('#scrim').classList.remove('on');
-  
+
   closeModal();
   buildNav();
   render();
@@ -5931,7 +6311,7 @@ function buildNav() {
     po: openPOs()
       .filter((o) => o.status === 'draft').length
   };
-  
+
   $('#nav').innerHTML = NAV.map((n, i) => {
     // A group heading belongs to the entries that follow it, up to the next
     // heading. Show it only when this role can actually see one of them,
@@ -5942,10 +6322,10 @@ function buildNav() {
       return mine.some((x) => pages.includes(x.id)) ? `<div class="nav-lbl">${n.g}</div>` : '';
     }
     if (!pages.includes(n.id)) return '';
-    
+
     const c = b[n.id] || 0;
     const amber = n.id === 'cal' || n.id === 'po' || n.id === 'war';
-    
+
     return `
       <a data-p="${n.id}" class="${VIEW.page === n.id ? 'on' : ''}">
         <span class="ic">${n.ic}</span>${n.t}
@@ -5953,11 +6333,11 @@ function buildNav() {
       </a>
     `;
   }).join('');
-  
+
   $$('#nav a').forEach((a) => {
     a.onclick = () => go(a.dataset.p);
   });
-  
+
   const n = alertCount();
   $('#alertDot').classList.toggle('hide', !n);
 }
@@ -5982,19 +6362,19 @@ function pageTitle(id) {
  */
 function buildSites() {
   const lock = VIEW.user.site && VIEW.user.site !== 'all';
-  
+
   if (lock && VIEW.site !== VIEW.user.site) VIEW.site = VIEW.user.site;
   if (!lock && VIEW.site !== 'all' && !S.sites.some((s) => s.id === VIEW.site)) VIEW.site = 'all';
-  
+
   const cur = VIEW.site === 'all' ? null : S.sites.find((s) => s.id === VIEW.site);
   const st = siteStats(VIEW.site);
-  
+
   $('#siteBtn').innerHTML = `
     <span class="cd">${cur ? esc(cur.code) : 'ALL'}</span>
     <span class="nm">${cur ? esc(cur.name) : 'All warehouses'}</span>
     ${st.alerts ? '<span class="wd"></span>' : ''}<span class="cv">▾</span>
   `;
-  
+
   const ps = $('#pgSite');
   if (ps) ps.textContent = cur ? cur.name : `All warehouses · ${S.sites.length} locations`;
 }
@@ -6008,7 +6388,7 @@ function siteStats(id) {
   const low = P.filter((p) => stockState(p) !== 'ok').length;
   const over = T.filter((t) => toolState(t) === 'over').length;
   const cal = T.filter((t) => ['due', 'exp'].includes(calState(t))).length;
-  
+
   return {
     parts: P.length,
     tools: T.length,
@@ -6024,11 +6404,11 @@ function siteStats(id) {
  */
 function siteSheet() {
   const lock = VIEW.user.site && VIEW.user.site !== 'all';
-  
+
   const row = (id, code, name, sub) => {
     const st = siteStats(id);
     const on = VIEW.site === id;
-    
+
     return `
       <button class="siterow ${on ? 'on' : ''}" onclick="setSite('${id}')">
         <span class="cd">${esc(code)}</span>
@@ -6047,7 +6427,7 @@ function siteSheet() {
       </button>
     `;
   };
-  
+
   openModal(
     'Warehouse',
     lock ? 'You have access to one location' : 'Choose which location to view',
@@ -6148,10 +6528,10 @@ function alertsModal() {
  */
 $('#meBtn').onclick = (e) => {
   e.stopPropagation();
-  
+
   const u = VIEW.user;
   const info = getSessionInfo();
-  
+
   openMenu(
     e.currentTarget,
     `
@@ -8907,7 +9287,7 @@ function renderAdmin() {
           <div class="fld">
             <label>Logo</label>
             <input id="cfgLogo" type="file" accept="image/*">
-            <div class="hlp">Square image works best. Stored on this device only.</div>
+            <div class="hlp">Square image works best. The logo stays on this device.</div>
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn pri" onclick="saveBrand()">Save branding</button>
@@ -8919,33 +9299,22 @@ function renderAdmin() {
       <div class="card">
         <div class="card-h">
           <div>
-            <div class="card-t">Google Sheets sync</div>
-            <div class="card-s">${S.cfg.sheetUrl ? 'Connected' : 'Not connected'}</div>
+            <div class="card-t">Live cloud sync</div>
+            <div class="card-s">${CLOUD ? 'Connected — real time' : 'Not connected'}</div>
           </div>
         </div>
         <div class="card-b">
-          <div class="fld">
-            <label>Apps Script web app URL</label>
-            <input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.cfg.sheetUrl)}">
-            <div class="hlp">Deploy the companion Apps Script as a web app, then paste the /exec URL here.</div>
+          <div style="font-size:12.5px;color:var(--ink2);line-height:1.55">
+            ${CLOUD
+              ? 'This store is shared live. Everyone who opens this page works on the same parts, tools, orders, accounts and history — a change made on one device appears on every other screen within seconds. No setup needed.'
+              : 'Real-time sync is not available in this view, so data is kept on this device only. Open the app from its online link to work on the shared store.'}
           </div>
-          <div class="fld">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-              <input id="cfgAuto" type="checkbox" style="width:16px;height:16px;cursor:pointer"
-                ${S.cfg.autoSync ? 'checked' : ''} onchange="saveAutoSync(this.checked)">
-              Load from the sheet every time the app opens
-            </label>
-            <div class="hlp">
-              The sheet becomes the source of truth — parts, tools, orders, sites and history are
-              replaced on each open. Accounts always stay on this device.
-              ${S.cfg.lastSync ? `Last read ${ago(S.cfg.lastSync)}.` : ''}
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn pri" onclick="saveUrl()">Save URL</button>
-            <button class="btn" onclick="syncPush()">Push to Sheets</button>
-            <button class="btn" onclick="syncPull()">Pull from Sheets</button>
-          </div>
+          ${CLOUD
+            ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:8px">
+                Uploaded photos are shared too, so a picture added on one device shows on all of
+                them. A very large photo is skipped rather than shared — use “Use a link” for those.
+              </div>`
+            : ''}
         </div>
       </div>
     </div>
@@ -9026,7 +9395,7 @@ function renderAdmin() {
       <div class="card-h">
         <div>
           <div class="card-t">Photos</div>
-          <div class="card-s">Stored on this device, separate from the main data</div>
+          <div class="card-s">${CLOUD ? 'Shared with everyone, kept separate from the main data' : 'Stored on this device, separate from the main data'}</div>
         </div>
       </div>
       <div class="card-b">
@@ -9046,7 +9415,7 @@ function renderAdmin() {
       <div class="card-h">
         <div>
           <div class="card-t">Data</div>
-          <div class="card-s">Everything lives in this browser until you sync</div>
+          <div class="card-s">${CLOUD ? 'Shared live with everyone on this link' : 'Everything lives in this browser'}</div>
         </div>
       </div>
       <div class="card-b" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -9642,33 +10011,20 @@ function clearLogo() {
   toast('Logo removed', 'good');
 }
 
-/**
- * Save the Apps Script endpoint
- */
-function saveUrl() {
-  S.cfg.sheetUrl = $('#cfgUrl').value.trim();
-  saveState();
-  render();
-  toast(S.cfg.sheetUrl ? 'Sheets URL saved' : 'Sheets URL cleared', 'good');
-}
-
-/**
- * Turn "load from the sheet on open" on or off
- */
-function saveAutoSync(on) {
-  S.cfg.autoSync = !!on;
-  saveState();
-
-  if (on && !S.cfg.sheetUrl) return toast('Add the Apps Script URL first', 'bad');
-  toast(on ? 'The sheet will load each time the app opens' : 'Automatic loading turned off', 'good');
-}
-
 /* ---------- photo maintenance ---------- */
 
 /**
  * Drop device photos no item points at any more
  */
 function prunePhotos() {
+  // Photos are shared now, so "unused" has to be judged against the whole
+  // store, not a half-loaded copy of it. Until the parts and tools snapshots
+  // have arrived, every photo here looks orphaned and pruning would delete the
+  // lot for everybody.
+  if (CLOUD && !(CLOUD_FIRST.parts && CLOUD_FIRST.tools)) {
+    return toast('Still loading from the cloud — try again in a moment', 'bad');
+  }
+
   const used = new Set([...S.parts, ...S.tools].map((o) => o.photo).filter(Boolean));
   const dead = Object.keys(PH).filter((k) => !used.has(k));
 
@@ -9677,7 +10033,7 @@ function prunePhotos() {
   dead.forEach((k) => delete PH[k]);
   savePhotos();
   render();
-  toast(`Removed ${dead.length} unused photo${dead.length === 1 ? '' : 's'}`, 'good');
+  toast(`Removed ${dead.length} unused photo${dead.length === 1 ? '' : 's'}${CLOUD ? ' — on every device' : ''}`, 'good');
 }
 
 /**
@@ -9686,12 +10042,17 @@ function prunePhotos() {
 function clearPhotos() {
   if (!can('admin')) return toast('Manager access required', 'bad');
 
-  openModal('Delete all device photos', 'Linked images are not affected', `
+  openModal('Delete all photos', 'Linked images are not affected', `
     <p style="font-size:13.5px;margin:0">
-      This removes every uploaded photo from this device
+      This removes every uploaded photo
       (${Object.keys(PH).length} images, ${(photoBytes(PH) / 1024 / 1024).toFixed(2)} MB).
       Parts and tools stay, they just lose their picture. Export a backup first if you want to keep them.
     </p>
+    ${CLOUD
+      ? `<p style="font-size:13px;color:var(--out);font-weight:600;margin:10px 0 0">
+           Photos are shared, so this deletes them for everyone, on every device — not just here.
+         </p>`
+      : ''}
   `, `
     <button class="btn" onclick="closeModal()">Cancel</button>
     <button class="btn dgr" onclick="doClearPhotos()">Delete all photos</button>
@@ -9858,8 +10219,8 @@ function impJSON(inp) {
 function resetAll() {
   openModal('Reset to demo data', 'This cannot be undone', `
     <p style="font-size:13.5px;margin:0">
-      All parts, tools, orders and activity on this device will be replaced with the original demo set.
-      Export a backup first if you want to keep anything.
+      All parts, tools, orders and activity will be replaced with the original demo set —
+      on every device sharing this store. Export a backup first if you want to keep anything.
     </p>
   `, `
     <button class="btn" onclick="closeModal()">Cancel</button>
@@ -9888,7 +10249,7 @@ function doReset() {
   toast('Reset to demo data', 'good');
 }
 
-/* ---------- Google Sheets sync ---------- */
+/* ---------- sync indicator ---------- */
 
 /**
  * Update the sync indicator in the sidebar footer
@@ -9899,115 +10260,6 @@ function setSync(t, colour) {
 
   dot.textContent = t;
   dot.style.color = colour || '';
-}
-
-/**
- * Push the local store up to the Apps Script endpoint
- */
-async function syncPush() {
-  if (!S.cfg.sheetUrl) return toast('Add the Apps Script URL first', 'bad');
-
-  setSync('● syncing…', '#C2740D');
-  toast('Pushing to Google Sheets…');
-
-  try {
-    await fetch(S.cfg.sheetUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: 'push',
-        payload: {
-          parts: S.parts,
-          tools: S.tools,
-          pos: S.pos,
-          sites: S.sites,
-          log: S.log.slice(0, 200)
-        }
-      })
-    });
-
-    S.cfg.lastSync = Date.now();
-    saveState();
-    setSync('● synced ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), '#8FE3C8');
-    toast('Pushed to Google Sheets', 'good');
-  } catch (e) {
-    setSync('● sync failed', '#FF9A92');
-    toast('Could not reach the Sheets endpoint', 'bad');
-  }
-}
-
-/**
- * Read the sheet and replace the local store with what it holds.
- *
- * Data only — no UI work — so this is safe to call before anyone has signed
- * in. Accounts are never touched: they live on the device, not in the sheet.
- *
- * @returns {Promise<Object>} counts of what came back
- * @throws if the endpoint is unreachable or answers with something unusable
- */
-async function pullData() {
-  // Give up rather than hang: an unreachable or sign-in-walled URL would
-  // otherwise leave the request open indefinitely.
-  const stop = new AbortController();
-  const timer = setTimeout(() => stop.abort(), 15000);
-
-  let d;
-  try {
-    const r = await fetch(S.cfg.sheetUrl + '?action=pull', { signal: stop.signal });
-    d = await r.json();
-  } finally {
-    clearTimeout(timer);
-  }
-
-  // A sheet with no Parts tab is almost always a wrong URL or a failed deploy,
-  // and overwriting good local data with it would be destructive.
-  if (!d || !Array.isArray(d.parts) || !d.parts.length) {
-    throw new Error('the sheet returned no parts');
-  }
-
-  S.parts = d.parts;
-  if (Array.isArray(d.tools)) S.tools = d.tools;
-  if (Array.isArray(d.pos)) S.pos = d.pos;
-  if (Array.isArray(d.sites) && d.sites.length) S.sites = d.sites;
-  if (Array.isArray(d.log)) S.log = d.log;
-
-  S.cfg.lastSync = Date.now();
-  await saveState();
-
-  return {
-    parts: S.parts.length,
-    tools: S.tools.length,
-    pos: S.pos.length,
-    sites: S.sites.length,
-    log: S.log.length
-  };
-}
-
-/**
- * Pull the store back down from the Apps Script endpoint, and redraw
- */
-async function syncPull() {
-  if (!S.cfg.sheetUrl) return toast('Add the Apps Script URL first', 'bad');
-
-  setSync('● syncing…', '#C2740D');
-
-  try {
-    const n = await pullData();
-
-    // Only touch the UI if someone is actually looking at it
-    if (VIEW.user) {
-      buildSites();
-      buildNav();
-      render();
-    }
-
-    setSync('● synced ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), '#8FE3C8');
-    toast(`Pulled ${n.parts} parts, ${n.tools} tools, ${n.pos} orders`, 'good');
-  } catch (e) {
-    setSync('● sync failed', '#FF9A92');
-    toast('Could not read from the Sheets endpoint', 'bad');
-  }
 }
 
 /* ===== js/app.js ===== */
@@ -10134,7 +10386,7 @@ function brand() {
     .join('')
     .slice(0, 2)
     .toUpperCase();
-  
+
   ['lk', 'rl'].forEach((k) => {
     const holder = $(`#${k}Logo`);
     if (c.logo) {
@@ -10143,7 +10395,7 @@ function brand() {
       holder.outerHTML = `<div id="${k}Logo" class="${k === 'lk' ? 'lk-mark' : 'rail-mark'}">${esc(ini)}</div>`;
     }
   });
-  
+
   $('#lkName').textContent = c.appName;
   $('#rlName').textContent = c.appName;
   document.title = c.appName + ' — Spare Parts & Tools';
@@ -10179,7 +10431,7 @@ async function initApp() {
 
     // Load state or initialize with seed
     await loadState();
-    
+
     // Load device photos before anything can render a thumbnail
     await loadPhotos();
 
@@ -10187,35 +10439,18 @@ async function initApp() {
     brand();
     tick();
 
-    // Show where the data currently lives
-    setSync(
-      S.cfg.sheetUrl
-        ? '● ' + (S.cfg.lastSync ? 'synced ' + ago(S.cfg.lastSync) : 'connected')
-        : '● local only'
-    );
+    // Local until the live store answers
+    setSync('● local only');
 
     // Setup auth handlers
     initAuth();
 
-    // Read the sheet only once signing in is possible, so a slow or
-    // unreachable endpoint can never leave the login screen dead.
-    if (S.cfg.autoSync && S.cfg.sheetUrl) {
-      setSync('● reading sheet…', '#C2740D');
-      pullData()
-        .then((n) => {
-          console.log(`✓ loaded from Google Sheets: ${n.parts} parts, ${n.tools} tools, ${n.pos} orders`);
-          setSync('● synced ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), '#8FE3C8');
-          if (VIEW.user) {
-            buildSites();
-            buildNav();
-            render();
-          }
-        })
-        .catch((e) => {
-          console.warn('Could not read the sheet, using the copy on this device:', e.message);
-          setSync('● local only');
-        });
-    }
+    // Connect the live shared store. Never awaited: signing in must work even
+    // while the connection is still coming up, or is unavailable entirely.
+    initCloud().catch((e) => {
+      console.warn('cloud unavailable, working from this device only:', e && e.message);
+      setSync('● local only');
+    });
 
     // Resume the session left behind by the last visit. Refreshing the page
     // should never throw the user back to the lock screen — only an explicit
@@ -10233,7 +10468,7 @@ async function initApp() {
         enter(user, rememberMe);
       }
     }
-    
+
     APP_READY = true;
     console.log('✓ SPARE PARTS MANAGEMENT SYSTEM initialized');
   } catch (e) {
@@ -10256,7 +10491,6 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
-
 
   </script>
 </body>
