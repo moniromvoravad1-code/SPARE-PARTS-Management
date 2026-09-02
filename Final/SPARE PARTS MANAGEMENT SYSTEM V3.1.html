@@ -6565,30 +6565,20 @@ async function changePassword() {
 }
 
 /**
- * First-run help under the sign-in form.
+ * Help under the sign-in form.
  *
- * While the store is still exactly as shipped, the setup credential is shown --
- * it is readable in the page source anyway, and a person who cannot get in has
- * no other way to find it. It disappears the moment the password is changed or
- * a second account exists. The reset is always offered, because otherwise a
- * forgotten password leaves the app unusable on that device.
+ * The setup credential is deliberately not printed here. A device that opens
+ * this file joins the shared store and receives its real accounts, so whoever
+ * reaches this screen either has an account already or needs a manager to
+ * create one -- printing the shipped password would simply hand it to anyone
+ * who opened the link. The reset stays, because otherwise a forgotten password
+ * leaves the app unusable on that device.
  */
 function lockHint() {
   const box = $('#lkHint');
   if (!box) return;
 
-  const shipped = DEMO_USERS[0];
-  const untouched = S.users.length === 1 &&
-    S.users[0].u === shipped.u &&
-    S.users[0].p === shipped.p;
-
   box.innerHTML = `
-    ${untouched
-      ? `<div class="lk-hint-k">
-           First run — sign in with <b>${esc(shipped.u)}</b> / <b>${esc(shipped.p)}</b>,
-           then change the password and add your team in Settings.
-         </div>`
-      : ''}
     <button type="button" class="lk-hint-a" onclick="resetDevice()">Trouble signing in?</button>
   `;
   box.classList.remove('hide');
