@@ -2045,6 +2045,180 @@ a {
   color: var(--ink);
 }
 
+/* ============ PHOTO GALLERY ============ */
+.thwrap {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+.thn {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  border: 1.5px solid var(--surface);
+}
+
+.phhero {
+  margin-bottom: 8px;
+}
+
+.hero-ph {
+  width: 100%;
+  height: 150px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.phstrip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 14px;
+}
+
+.phstrip img,
+.phstrip .phmiss {
+  width: 52px;
+  height: 52px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex: none;
+  cursor: zoom-in;
+  border: 1px solid var(--line);
+  background: var(--surface3);
+}
+
+.phstrip img.on {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+
+.phmiss {
+  display: grid;
+  place-items: center;
+  color: var(--ink3);
+  font-family: var(--mono);
+  font-weight: 700;
+  cursor: default;
+}
+
+.phgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.phcard {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface2);
+}
+
+.phcard.main {
+  border-color: var(--brand);
+}
+
+.phcard img,
+.phcard .pv {
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+}
+
+.phcard .pv.ph0 {
+  display: grid;
+  place-items: center;
+  color: var(--ink3);
+  font-family: var(--mono);
+  font-weight: 700;
+  background: var(--surface3);
+  cursor: default;
+}
+
+.phcard-b {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 5px;
+  border-top: 1px solid var(--line);
+}
+
+.phcard-t {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--ink3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phcard-a {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.phcard-a button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 4px;
+  color: var(--ink3);
+}
+
+.phcard-a button:hover {
+  background: var(--surface3);
+  color: var(--ink);
+}
+
+.phadd {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  height: 100px;
+  border: 1.5px dashed var(--line2);
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--ink3);
+  background: var(--surface2);
+}
+
+.phadd:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.phadd span:first-child {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.phadd-t {
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
 /* ============ PERMISSION MATRIX ============ */
 .modal.wide {
   max-width: 880px;
@@ -3351,13 +3525,41 @@ function loadScript(src) {
 async function initFirebase() {
   const V = '10.12.4';
   await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js`);
+  await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js`);
   await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js`);
 
   firebase.initializeApp(FIREBASE_CONFIG);
+
+  // Sign in before touching the database. The security rules require it, so a
+  // reader who has only the address - and not an account - gets nothing. The
+  // identity is anonymous and per device; the app's own sign-in still decides
+  // who the person is and what they may do.
+  try {
+    const cred = await firebase.auth().signInAnonymously();
+    CLOUD_UID = cred && cred.user ? cred.user.uid : null;
+    CLOUD_SECURED = true;
+  } catch (e) {
+    // Anonymous sign-in has not been switched on in the Firebase console yet.
+    // Carry on unauthenticated rather than taking the shared store down: the
+    // rules still allow it today. CLOUD_SECURED stays false so the app can say
+    // plainly that the data is reachable by anyone holding the address.
+    const code = (e && e.code) || '';
+    CLOUD_UID = null;
+    CLOUD_SECURED = false;
+    console.warn(
+      /configuration-not-found|operation-not-allowed/.test(code)
+        ? 'Firebase anonymous sign-in is not enabled — the shared store is UNSECURED. ' +
+          'Firebase console -> Authentication -> Sign-in method -> Anonymous -> Enable.'
+        : 'Firebase sign-in failed (' + (code || e.message) + ') — the shared store is UNSECURED.'
+    );
+  }
+
   return firebase.firestore();
 }
 
 let CLOUD = null;                 // db namespace, or null when unavailable
+let CLOUD_UID = null;             // this device's anonymous identity, when signed in
+let CLOUD_SECURED = false;        // true once the store is reached as a signed-in caller
 let CLOUD_LIVE = false;           // at least one snapshot has been processed
 let CLOUD_APPLYING = false;       // a remote snapshot is being adopted
 let CLOUD_TIMER = null;           // debounce for pushes
@@ -5180,14 +5382,189 @@ let PH = {}; // Photo storage
  * @param {Object} o - Part or tool object
  * @returns {string|null} Photo URL or data URI
  */
+/**
+ * How many extra pictures an item may carry beyond its main one.
+ */
+const MAX_EXTRA_PHOTOS = 5;
+
+/**
+ * Image-loading failures, newest first, for the manager's diagnostic panel.
+ * Kept in memory only - it describes this device's view of the store.
+ */
+let PHOTO_ERRORS = [];
+
+function logPhotoError(kind, ref, o, detail) {
+  const e = {
+    at: Date.now(),
+    kind,
+    ref: String(ref || ''),
+    item: o ? (o.sku || o.code || o.id) : '',
+    name: o ? (o.name || '') : '',
+    detail: detail || ''
+  };
+
+  PHOTO_ERRORS = [e, ...PHOTO_ERRORS.filter((x) => !(x.kind === kind && x.ref === e.ref))].slice(0, 200);
+  console.warn('photo ' + kind + ':', e.ref || '(empty)', e.item, detail || '');
+}
+
+/**
+ * The storage key for a picture, derived from the picture itself.
+ *
+ * Content addressing means the same image saved on two items is stored once,
+ * and re-uploading a picture that is already held costs nothing.
+ */
+function photoKey(dataUri) {
+  return 'ph_' + hex(sha256(new TextEncoder().encode(dataUri))).slice(0, 24);
+}
+
+/** Is this reference an external link rather than something we store? */
+const isLinkRef = (ref) => /^https?:\/\//i.test(String(ref || ''));
+
+/** Every picture on an item, main first. */
+function photoRefs(o) {
+  if (!o) return [];
+
+  const extra = Array.isArray(o.photos) ? o.photos : [];
+  return [o.photo, ...extra].filter((r) => typeof r === 'string' && r);
+}
+
+/**
+ * Turn one reference into something an img tag can use, or null.
+ * A link is handed back as-is; anything else is looked up in the store.
+ */
+function photoSrcOf(ref) {
+  if (!ref) return null;
+  if (isLinkRef(ref)) return ref;
+
+  return PH[ref] || null;
+}
+
+/** The main picture of an item, or null. */
 function photoSrc(o) {
   if (!o || !o.photo) return null;
 
-  // External URL
-  if (/^https?:\/\//i.test(o.photo)) return o.photo;
+  const src = photoSrcOf(o.photo);
+  if (!src) logPhotoError('missing', o.photo, o, 'no image data for this reference');
 
-  // Local storage data URI
-  return PH[o.photo] || null;
+  return src;
+}
+
+/**
+ * A placeholder that names the item instead of showing a broken icon.
+ * Used both when there is no picture and when one fails to load.
+ */
+function phTile(o, cls, label) {
+  // The item's own number first - it is what identifies the thing on a shelf.
+  const num = (o && (o.sku || o.code)) || label || '';
+  const short = String(num).replace(/^TL-/, '').slice(0, 6);
+
+  return `<div class="th ph0 ${cls || ''}" title="${esc(num || 'No photo')}">${esc(short || '▤')}</div>`;
+}
+
+/**
+ * List thumbnail. On a load failure it swaps itself for the same placeholder
+ * the no-photo case uses, and records why for the diagnostic panel.
+ */
+function thumb(o, fallback, cls) {
+  const src = photoSrc(o);
+  const classes = 'th ' + (cls || '');
+  const n = photoRefs(o).length;
+
+  if (!src) return phTile(o, cls, fallback);
+
+  const fail = `phFail('${o.id}', this)`;
+
+  return `
+    <span class="thwrap">
+      <img class="${classes}" src="${esc(src)}" alt="${esc(o.name || '')}" loading="lazy"
+        onclick="event.stopPropagation();viewPhoto('${o.id}')"
+        onerror="${fail}">
+      ${n > 1 ? `<span class="thn">${n}</span>` : ''}
+    </span>
+  `;
+}
+
+/**
+ * An image failed to load. Replace it with the named placeholder and log it -
+ * a broken-image icon tells the user nothing and hides the cause.
+ */
+function phFail(id, img) {
+  const o = anyById(id);
+  const ref = o ? o.photo : '';
+
+  logPhotoError(isLinkRef(ref) ? 'badlink' : 'notfound', ref, o,
+    isLinkRef(ref) ? 'the linked address did not load' : 'stored image could not be decoded');
+
+  if (img && img.outerHTML !== undefined) img.outerHTML = phTile(o, '', o ? (o.cat || o.code) : '');
+}
+
+/**
+ * Every picture on an item, as a strip for the detail sheet.
+ */
+function photoStrip(o) {
+  const refs = photoRefs(o);
+  if (!refs.length) return '';
+
+  const main = photoSrcOf(refs[0]);
+
+  return `
+    <div class="phhero">
+      ${main
+        ? `<img class="hero" src="${esc(main)}" alt="${esc(o.name || '')}"
+             onclick="viewPhoto('${o.id}',0)" onerror="phFail('${o.id}', this)">`
+        : phTile(o, 'hero-ph', o.sku || o.code)}
+    </div>
+    ${refs.length > 1
+      ? `<div class="phstrip">
+          ${refs.map((r, i) => {
+            const s = photoSrcOf(r);
+            return s
+              ? `<img src="${esc(s)}" alt="" class="${i === 0 ? 'on' : ''}"
+                   onclick="viewPhoto('${o.id}',${i})"
+                   onerror="this.outerHTML='<span class=\\'phmiss\\'>?</span>'">`
+              : `<span class="phmiss" title="This picture is missing">?</span>`;
+          }).join('')}
+        </div>`
+      : ''}
+  `;
+}
+
+/**
+ * Full-size viewer, with paging when an item has more than one picture.
+ */
+function viewPhoto(id, idx) {
+  const o = anyById(id);
+  const refs = photoRefs(o);
+
+  if (!refs.length) return toast('No photo on this item yet');
+
+  let i = Math.max(0, Math.min(refs.length - 1, idx || 0));
+  const ref = refs[i];
+  const src = photoSrcOf(ref);
+
+  const where = isLinkRef(ref)
+    ? 'Linked image · ' + esc(String(ref).slice(0, 60))
+    : 'Shared with every device';
+
+  openModal(
+    o.name,
+    (o.sku || o.code) + (refs.length > 1 ? ` · picture ${i + 1} of ${refs.length}` : ''),
+    `
+      ${src
+        ? `<img src="${esc(src)}" alt="${esc(o.name || '')}" style="width:100%;border-radius:10px;display:block"
+             onerror="phFail('${o.id}', this)">`
+        : `<div class="empty"><div class="e-i">▤</div><div class="e-t">Picture not available</div>
+             <div class="e-s">${esc(o.sku || o.code || '')} — the image data has not reached this device.</div></div>`}
+      <div style="font-size:11.5px;color:var(--ink3);margin-top:10px">${where}</div>
+    `,
+    `
+      ${refs.length > 1
+        ? `<button class="btn" onclick="viewPhoto('${o.id}',${(i - 1 + refs.length) % refs.length})">‹ Previous</button>
+           <button class="btn" onclick="viewPhoto('${o.id}',${(i + 1) % refs.length})">Next ›</button>`
+        : ''}
+      <button class="btn" onclick="closeModal()">Close</button>
+    `
+  );
 }
 
 /**
@@ -5269,44 +5646,12 @@ function shrinkImage(file) {
  * @param {string} fallback - Fallback text
  * @param {string} cls - CSS class
  */
-function thumb(o, fallback, cls) {
-  const src = photoSrc(o);
-  const classes = 'th ' + (cls || '');
-
-  if (src) {
-    return `
-      <img class="${classes}" src="${esc(src)}" alt="" loading="lazy"
-        onclick="event.stopPropagation();viewPhoto('${o.id}')"
-        onerror="this.outerHTML='<div class=\\'th ph0 ${cls||''}\\'>?</div>'">
-    `;
-  }
-
-  return `<div class="th ph0 ${cls || ''}">${esc((fallback || '—').slice(0, 2).toUpperCase())}</div>`;
-}
+/* thumb() now lives in the photo core above */
 
 /**
  * View full-size photo in modal
  */
-function viewPhoto(id) {
-  const o = anyById(id);
-  const src = photoSrc(o);
-
-  if (!src) {
-    return toast('No photo on this item yet');
-  }
-
-  openModal(
-    o.name,
-    o.sku || o.code,
-    `
-      <img src="${esc(src)}" alt="" style="width:100%;border-radius:10px;display:block">
-      <div style="font-size:11.5px;color:var(--ink3);margin-top:10px">
-        ${/^https?:/i.test(o.photo) ? 'Linked image · ' + esc(o.photo.slice(0, 60)) : 'Stored on this device'}
-      </div>
-    `,
-    `<button class="btn" onclick="closeModal()">Close</button>`
-  );
-}
+/* viewPhoto() now lives in the photo core above */
 
 /**
  * Load photos from storage
@@ -5318,141 +5663,211 @@ async function loadPhotos() {
 
 /* ---------- photo picker (shared by the part and tool editors) ---------- */
 
-// undefined = untouched, '' = remove, otherwise a data URI or an http link
-let EDITPH;
 
 /**
  * Photo field for an editor form - preview plus upload / link / remove
  * @param {Object} o - Part or tool being edited
  */
+/**
+ * Pictures being edited. Held apart from the record so Cancel really cancels:
+ * refs is the working list, main first.
+ */
+let PHDRAFT = null;
+
+/**
+ * The photo block in the part and tool editors: a main picture, up to
+ * MAX_EXTRA_PHOTOS more, and preview / replace / delete on each.
+ */
 function photoField(o) {
-  EDITPH = undefined;
-  const src = photoSrc(o);
-  const linked = /^https?:/i.test(o.photo || '');
+  PHDRAFT = { refs: photoRefs(o).slice(), item: o };
 
   return `
     <div class="fld">
-      <label>Photo</label>
-      <div class="phfld">
-        <div id="phPrev">
-          ${src ? `<img class="pv" src="${esc(src)}" alt="">` : '<div class="pv ph0">▤</div>'}
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="ac">
-            <label class="lbl-btn">Upload photo
-              <input type="file" accept="image/*" style="display:none" onchange="pickPhoto(this)">
-            </label>
-            <button type="button" class="btn sm" onclick="linkPhoto()">Use a link</button>
-            <button type="button" class="btn sm" onclick="clearPhoto()">Remove</button>
-          </div>
-          <div class="hlp" id="phHint">
-            ${src
-              ? (linked ? 'Currently linked to an external image.' : 'Stored on this device.')
-              : 'On a phone this opens the camera or your gallery.'}
-          </div>
-        </div>
-      </div>
+      <label>Photos</label>
+      <div id="phHost">${photoEditor()}</div>
     </div>
   `;
 }
 
-/**
- * Update the picker preview and hint
- */
-function phPreview(src, hint) {
-  $('#phPrev').innerHTML = src ? `<img class="pv" src="${esc(src)}" alt="">` : '<div class="pv ph0">▤</div>';
-  $('#phHint').textContent = hint;
+/** Redraw just the photo block. */
+function phRepaint() {
+  const h = $('#phHost');
+  if (h) h.innerHTML = photoEditor();
+}
+
+function photoEditor() {
+  const refs = PHDRAFT ? PHDRAFT.refs : [];
+  const full = refs.length >= MAX_EXTRA_PHOTOS + 1;
+
+  const card = (ref, i) => {
+    const src = photoSrcOf(ref);
+    const linked = isLinkRef(ref);
+
+    return `
+      <div class="phcard${i === 0 ? ' main' : ''}">
+        ${src
+          ? `<img src="${esc(src)}" alt="" onclick="viewDraft(${i})"
+               onerror="this.outerHTML='<div class=\\'pv ph0\\'>?</div>'">`
+          : '<div class="pv ph0" title="This picture has not reached this device">?</div>'}
+        <div class="phcard-b">
+          <span class="phcard-t">${i === 0 ? 'Main' : 'Extra ' + i}${linked ? ' · link' : ''}</span>
+          <span class="phcard-a">
+            ${i > 0 ? `<button type="button" title="Make this the main photo" onclick="phMakeMain(${i})">★</button>` : ''}
+            <button type="button" title="Remove this photo" onclick="phDrop(${i})">✕</button>
+          </span>
+        </div>
+      </div>
+    `;
+  };
+
+  return `
+    <div class="phgrid">
+      ${refs.map(card).join('')}
+      ${full
+        ? ''
+        : `<label class="phadd" title="Add a photo">
+             <input type="file" accept="image/*" multiple style="display:none" onchange="pickPhoto(this)">
+             <span>＋</span><span class="phadd-t">Add photo</span>
+           </label>`}
+    </div>
+    <div class="ac" style="margin-top:8px">
+      <button type="button" class="btn sm" onclick="linkPhoto()" ${full ? 'disabled' : ''}>Add a link</button>
+      ${refs.length ? '<button type="button" class="btn sm" onclick="phDropAll()">Remove all</button>' : ''}
+    </div>
+    <div class="hlp" id="phHint">
+      ${refs.length
+        ? `${refs.length} of ${MAX_EXTRA_PHOTOS + 1} · the first one shows in lists. Saved for everyone when you save the item.`
+        : 'On a phone this opens the camera or your gallery. Up to ' + (MAX_EXTRA_PHOTOS + 1) + ' pictures.'}
+    </div>
+  `;
+}
+
+/** Open one of the pictures currently being edited. */
+function viewDraft(i) {
+  const ref = PHDRAFT && PHDRAFT.refs[i];
+  const src = photoSrcOf(ref);
+  if (!src) return toast('That picture is not on this device yet', 'bad');
+
+  openModal('Photo', PHDRAFT.item ? (PHDRAFT.item.name || '') : '', `
+    <img src="${esc(src)}" alt="" style="width:100%;border-radius:10px;display:block">
+  `, '<button class="btn" onclick="closeModal()">Close</button>');
+}
+
+function phMakeMain(i) {
+  if (!PHDRAFT || !PHDRAFT.refs[i]) return;
+
+  const [ref] = PHDRAFT.refs.splice(i, 1);
+  PHDRAFT.refs.unshift(ref);
+  phRepaint();
+}
+
+function phDrop(i) {
+  if (!PHDRAFT) return;
+
+  PHDRAFT.refs.splice(i, 1);
+  phRepaint();
+}
+
+function phDropAll() {
+  if (!PHDRAFT) return;
+
+  PHDRAFT.refs = [];
+  phRepaint();
 }
 
 /**
- * Handle a file chosen in the picker - resize, then hold it until save
+ * Take the pictures chosen in the file dialog, shrink each, and add it.
+ * Content addressing means picking the same file twice costs nothing.
  */
 async function pickPhoto(inp) {
-  const f = inp.files && inp.files[0];
+  const files = [...(inp.files || [])];
   inp.value = '';
-  if (!f) return;
+  if (!files.length || !PHDRAFT) return;
 
-  $('#phHint').textContent = 'Processing…';
-
-  try {
-    const data = await shrinkImage(f);
-    const kb = Math.round(data.length * 0.75 / 1024);
-
-    if (!STORE.idb && !STORE.ls) {
-      return phPreview(
-        photoSrc({ photo: EDITPH }),
-        'This browser is not saving anything from this file, so a photo cannot be kept. Use a link instead.'
-      );
-    }
-
-    // photoBudget(), not the constant — the picker and the Settings meter have
-    // to agree on which backend is live, or one will accept what the other says
-    // will not fit.
-    if (photoBytes(PH) + data.length > photoBudget()) {
-      return phPreview(
-        photoSrc({ photo: EDITPH }),
-        'Photo storage is full. Remove some photos first, or use a link instead.'
-      );
-    }
-
-    EDITPH = data;
-    phPreview(data, `Ready to save · ${kb} KB (resized from ${Math.round(f.size / 1024)} KB)`);
-  } catch (e) {
-    phPreview(null, e.message);
+  if (!STORE.idb && !STORE.ls) {
+    return toast('This browser is not saving anything from this file, so a photo cannot be kept', 'bad');
   }
+
+  const room = MAX_EXTRA_PHOTOS + 1 - PHDRAFT.refs.length;
+  if (room <= 0) return toast(`That is already ${MAX_EXTRA_PHOTOS + 1} pictures`, 'bad');
+
+  const take = files.slice(0, room);
+  if (files.length > room) toast(`Only ${room} more picture${room === 1 ? '' : 's'} fit — the rest were skipped`);
+
+  for (const f of take) {
+    try {
+      const data = await shrinkImage(f);
+
+      if (data.length > CLOUD_DOC_MAX) {
+        toast('That picture is too large to share even after resizing — use a link', 'bad');
+        continue;
+      }
+
+      const key = photoKey(data);
+      PH[key] = data;                                   // same picture twice = one entry
+      if (!PHDRAFT.refs.includes(key)) PHDRAFT.refs.push(key);
+    } catch (e) {
+      logPhotoError('upload', '', PHDRAFT.item, e.message);
+      toast(e.message, 'bad');
+    }
+  }
+
+  phRepaint();
 }
 
-/**
- * Point the item at an external image instead of storing one
- */
+/** Add an externally hosted image by address. */
 function linkPhoto() {
-  const cur = EDITPH !== undefined && /^https?:/i.test(EDITPH || '') ? EDITPH : '';
-  const v = prompt('Paste the image address (must start with https://)', cur);
+  if (!PHDRAFT) return;
+  if (PHDRAFT.refs.length >= MAX_EXTRA_PHOTOS + 1) return toast('No room for another picture', 'bad');
+
+  const v = prompt('Paste the image address (it must start with http:// or https://)', '');
   if (v === null) return;
 
   const u = v.trim();
-  if (!u) {
-    EDITPH = '';
-    return phPreview(null, 'Photo will be removed on save.');
-  }
-  if (!/^https?:\/\//i.test(u)) {
-    return toast('Links must start with http:// or https://', 'bad');
-  }
+  if (!u) return;
 
-  EDITPH = u;
-  phPreview(u, 'Linked image. Nothing is stored on this device.');
+  if (!/^https?:\/\//i.test(u)) return toast('Links must start with http:// or https://', 'bad');
+
+  if (!PHDRAFT.refs.includes(u)) PHDRAFT.refs.push(u);
+  phRepaint();
 }
 
-/**
- * Queue removal of the current photo
- */
+/** Kept so any older call site still works. */
 function clearPhoto() {
-  EDITPH = '';
-  phPreview(null, 'Photo will be removed on save.');
+  phDropAll();
 }
 
 /**
- * Apply the pending picker choice to an item
- * @returns {boolean} true if device photo storage changed
+ * Write the edited picture list onto the record.
+ *
+ * @returns {boolean} whether the stored pictures changed and need saving
  */
 function commitPhoto(o) {
-  if (EDITPH === undefined) return false;
+  if (!PHDRAFT || PHDRAFT.item !== o) return false;
 
-  // Drop the old device copy - a linked image never had one
-  if (o.photo && !/^https?:/i.test(o.photo)) delete PH[o.photo];
+  const before = photoRefs(o);
+  const after = PHDRAFT.refs.slice();
 
-  if (EDITPH === '') {
-    o.photo = '';
-  } else if (/^https?:/i.test(EDITPH)) {
-    o.photo = EDITPH;
-  } else {
-    const id = uid('ph');
-    PH[id] = EDITPH;
-    o.photo = id;
-  }
+  o.photo = after[0] || '';
+  o.photos = after.slice(1);
 
-  EDITPH = undefined;
-  return true;
+  // Drop any stored picture nothing points at any more. Content addressing
+  // means a key may still be in use by another item, so check the whole store.
+  const gone = before.filter((r) => !after.includes(r) && !isLinkRef(r));
+  let touched = false;
+
+  gone.forEach((ref) => {
+    const stillUsed = [...S.parts, ...S.tools].some((x) => x !== o && photoRefs(x).includes(ref));
+    if (!stillUsed && PH[ref]) {
+      delete PH[ref];
+      touched = true;
+    }
+  });
+
+  const added = after.some((r) => !isLinkRef(r) && !before.includes(r));
+  PHDRAFT = null;
+
+  return touched || added;
 }
 
 // Photos are loaded from initApp(), after initStorage() has chosen a backend.
@@ -7167,7 +7582,7 @@ function partDetail(id) {
   const hist = S.log.filter((l) => l.txt.includes(p.name)).slice(0, 6);
 
   openModal(p.name, p.sku + ' · ' + p.cat, `
-    ${photoSrc(p) ? `<img class="hero" src="${esc(photoSrc(p))}" alt="" onclick="viewPhoto('${p.id}')">` : ''}
+    ${photoStrip(p)}
     <div style="margin-bottom:14px">
       ${sbar(p)}
       <div class="sb-lg">
@@ -7795,7 +8210,7 @@ function toolDetail(id) {
   const t = toolById(id);
 
   openModal(t.name, t.code + ' · ' + t.cat, `
-    ${photoSrc(t) ? `<img class="hero" src="${esc(photoSrc(t))}" alt="" onclick="viewPhoto('${t.id}')">` : ''}
+    ${photoStrip(t)}
     <div class="kv"><span>Status</span><b>${tlPill(toolState(t))}</b></div>
     <div class="kv"><span>Home site</span><b>${esc(siteName(t.site))}</b></div>
     <div class="kv"><span>Condition</span><b>${esc(t.cond)}</b></div>
@@ -9300,7 +9715,7 @@ function renderAdmin() {
         <div class="card-h">
           <div>
             <div class="card-t">Live cloud sync</div>
-            <div class="card-s">${CLOUD ? 'Connected — real time' : 'Not connected'}</div>
+            <div class="card-s">${CLOUD ? (CLOUD_SECURED ? 'Connected — real time, signed in' : 'Connected — real time, NOT secured') : 'Not connected'}</div>
           </div>
         </div>
         <div class="card-b">
@@ -9309,6 +9724,17 @@ function renderAdmin() {
               ? 'This store is shared live. Everyone who opens this page works on the same parts, tools, orders, accounts and history — a change made on one device appears on every other screen within seconds. No setup needed.'
               : 'Real-time sync is not available in this view, so data is kept on this device only. Open the app from its online link to work on the shared store.'}
           </div>
+          ${CLOUD && !CLOUD_SECURED
+            ? `<div style="font-size:12px;color:var(--out);line-height:1.5;margin-top:10px;
+                 border:1px solid var(--out);border-radius:8px;padding:9px 11px">
+                <b>This shared store is not secured.</b> Anyone who has the address of this page can
+                read every part, tool, order, photo and account, and can overwrite them — no sign-in
+                required. To close it: Firebase console → Authentication → Sign-in method → enable
+                <b>Anonymous</b>, then Firestore Database → Rules → require
+                <span class="mono">request.auth != null</span>. The app signs in on its own once that
+                is on; nothing here needs changing.
+              </div>`
+            : ''}
           ${CLOUD
             ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:8px">
                 Uploaded photos are shared too, so a picture added on one device shows on all of
@@ -9401,6 +9827,7 @@ function renderAdmin() {
       <div class="card-b">
         ${photoStats()}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn" onclick="photoDiagnostics()">Check photos</button>
           <button class="btn" onclick="prunePhotos()">Remove unused photos</button>
           ${admin ? '<button class="btn dgr" onclick="clearPhotos()">Delete all device photos</button>' : ''}
         </div>
@@ -10016,6 +10443,167 @@ function clearLogo() {
 /**
  * Drop device photos no item points at any more
  */
+/**
+ * Check every picture reference in the store and say what is wrong with it.
+ *
+ * Link checks need the network, so they are done with a real load attempt and
+ * a timeout rather than by guessing from the address.
+ *
+ * @returns {Promise<Array>} one row per problem, worst first
+ */
+async function photoAudit() {
+  const rows = [];
+  const items = [...S.parts, ...S.tools];
+  const used = new Set();
+  const links = [];
+
+  items.forEach((o) => {
+    const refs = photoRefs(o);
+    const where = (o.sku || o.code || o.id) + ' · ' + (o.name || '');
+
+    if (o.photos && !Array.isArray(o.photos)) {
+      rows.push({ kind: 'invalid', item: where, ref: '', note: 'the extra-photo list is not a list' });
+    }
+
+    if (refs.length > MAX_EXTRA_PHOTOS + 1) {
+      rows.push({ kind: 'invalid', item: where, ref: '', note: `${refs.length} pictures, over the limit of ${MAX_EXTRA_PHOTOS + 1}` });
+    }
+
+    refs.forEach((ref) => {
+      if (isLinkRef(ref)) {
+        links.push({ ref, item: where });
+        return;
+      }
+
+      if (!/^ph_[a-z0-9]+$/i.test(ref)) {
+        rows.push({ kind: 'invalid', item: where, ref, note: 'not a stored picture and not a web address' });
+        return;
+      }
+
+      used.add(ref);
+
+      if (!PH[ref]) {
+        rows.push({
+          kind: 'missing', item: where, ref,
+          note: CLOUD ? 'the picture has not reached this device' : 'the picture is not on this device and there is no shared store'
+        });
+        return;
+      }
+
+      if (!/^data:image\//i.test(PH[ref])) {
+        rows.push({ kind: 'invalid', item: where, ref, note: 'stored data is not an image' });
+        return;
+      }
+
+      const size = JSON.stringify({ id: ref, data: PH[ref] }).length;
+      if (size > CLOUD_DOC_MAX) {
+        rows.push({
+          kind: 'toobig', item: where, ref,
+          note: `${Math.round(size / 1024)} KB — over the ${Math.round(CLOUD_DOC_MAX / 1024)} KB limit, so it is never shared`
+        });
+      } else if (CLOUD && CLOUD_FIRST.photos && !(CLOUD_LAST.photos || {})[ref]) {
+        rows.push({ kind: 'unshared', item: where, ref, note: 'held on this device but not yet in the shared store' });
+      }
+    });
+  });
+
+  // Stored pictures nothing points at any more
+  Object.keys(PH).forEach((ref) => {
+    if (!used.has(ref)) {
+      rows.push({ kind: 'orphan', item: '—', ref, note: 'stored but no part or tool uses it' });
+    }
+  });
+
+  // Do the link checks together, with a ceiling on how long we wait
+  const check = (u) => new Promise((res) => {
+    const img = new Image();
+    const done = (ok) => { img.onload = img.onerror = null; res(ok); };
+    const timer = setTimeout(() => done(false), 8000);
+    img.onload = () => { clearTimeout(timer); done(true); };
+    img.onerror = () => { clearTimeout(timer); done(false); };
+    img.src = u;
+  });
+
+  const seenLinks = {};
+  for (const l of links) {
+    if (seenLinks[l.ref] === undefined) seenLinks[l.ref] = await check(l.ref);
+    if (!seenLinks[l.ref]) {
+      rows.push({ kind: 'badlink', item: l.item, ref: l.ref, note: 'this address did not load' });
+    }
+  }
+
+  const order = { missing: 0, badlink: 1, invalid: 2, toobig: 3, unshared: 4, orphan: 5 };
+  return rows.sort((a, b) => (order[a.kind] ?? 9) - (order[b.kind] ?? 9));
+}
+
+const PHOTO_KIND = {
+  missing: ['Picture not here', 'out'],
+  badlink: ['Link will not load', 'out'],
+  invalid: ['Bad reference', 'out'],
+  toobig: ['Too large to share', 'low'],
+  unshared: ['Not shared yet', 'low'],
+  orphan: ['Unused', 'mute']
+};
+
+/** Manager-only report on the health of every picture in the store. */
+async function photoDiagnostics() {
+  if (!canDo('admin', 'view')) return toast('Manager access required', 'bad');
+
+  openModal('Photo diagnostics', 'Checking every picture…', `
+    <div class="empty"><div class="e-i">◌</div><div class="e-t">Checking…</div>
+      <div class="e-s">Web links are being loaded to see whether they still work.</div></div>
+  `, '<button class="btn" onclick="closeModal()">Close</button>', true);
+
+  const rows = await photoAudit();
+  const items = [...S.parts, ...S.tools];
+  const withPhoto = items.filter((o) => photoRefs(o).length).length;
+
+  const body = `
+    <div class="f2" style="margin-bottom:12px">
+      <div class="kv"><span>Items with a picture</span><b>${withPhoto} of ${items.length}</b></div>
+      <div class="kv"><span>Pictures stored here</span><b>${Object.keys(PH).length}</b></div>
+      <div class="kv"><span>Shared store</span><b>${CLOUD ? (CLOUD_LIVE ? 'connected' : 'connecting') : 'not connected'}</b></div>
+      <div class="kv"><span>Problems found</span><b style="color:${rows.length ? 'var(--out)' : 'var(--ok)'}">${rows.length}</b></div>
+    </div>
+
+    ${rows.length
+      ? `<table class="tbl">
+          <thead><tr><th>Problem</th><th>Item</th><th>Reference</th><th>Detail</th></tr></thead>
+          <tbody>
+            ${rows.map((r) => {
+              const [label, pill] = PHOTO_KIND[r.kind] || [r.kind, 'mute'];
+              return `<tr>
+                <td><span class="pill ${pill}">${esc(label)}</span></td>
+                <td>${esc(r.item)}</td>
+                <td class="mono" style="font-size:11px">${esc(String(r.ref).slice(0, 34) || '—')}</td>
+                <td style="color:var(--ink2)">${esc(r.note)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`
+      : `<div class="empty"><div class="e-i">✓</div><div class="e-t">Every picture checks out</div>
+          <div class="e-s">All references resolve, all links load, and nothing is orphaned.</div></div>`}
+
+    ${PHOTO_ERRORS.length
+      ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+           color:var(--ink3);margin:16px 0 6px">Recent load failures on this device</div>
+         ${PHOTO_ERRORS.slice(0, 8).map((e) => `
+           <div style="font-size:12px;padding:5px 0;border-bottom:1px dashed var(--line)">
+             <span class="mono">${esc(e.ref.slice(0, 30) || '—')}</span> · ${esc(e.item)}
+             <div style="color:var(--ink3);font-size:11.5px">${esc(e.kind)} — ${esc(e.detail)} · ${ago(e.at)}</div>
+           </div>`).join('')}`
+      : ''}
+  `;
+
+  const orphans = rows.filter((r) => r.kind === 'orphan').length;
+
+  openModal('Photo diagnostics', `${rows.length} problem${rows.length === 1 ? '' : 's'} found`, body, `
+    <button class="btn" onclick="closeModal()">Close</button>
+    ${orphans ? `<button class="btn" onclick="closeModal();prunePhotos()">Remove ${orphans} unused</button>` : ''}
+    <button class="btn pri" onclick="photoDiagnostics()">Check again</button>
+  `, true);
+}
+
 function prunePhotos() {
   // Photos are shared now, so "unused" has to be judged against the whole
   // store, not a half-loaded copy of it. Until the parts and tools snapshots

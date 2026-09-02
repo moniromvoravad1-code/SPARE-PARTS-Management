@@ -1,0 +1,51 @@
+// Firestore security rules for the Spare Parts Management System.
+//
+// Paste into: Firebase console -> Firestore Database -> Rules -> Publish.
+//
+// BEFORE PUBLISHING, turn on anonymous sign-in, or every device is locked out:
+//   Firebase console -> Authentication -> Sign-in method -> Anonymous -> Enable
+//
+// The app signs in by itself once that is on; nothing in the app needs changing.
+// Until then it keeps working and says plainly, in Settings, that the store is
+// not secured.
+//
+// What this buys, honestly: it stops anyone who merely has the address of the
+// page from reading or overwriting the store. It does NOT enforce the app's own
+// roles and warehouse scopes - every signed-in device is equal here, and the
+// per-account permissions are applied by the app, not by these rules. Enforcing
+// those server-side needs real per-user accounts and custom claims, which is a
+// larger piece of work.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Everything the app shares: sites, parts, tools, pos, users, log, photos.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+
+// A stricter variant, once every device has been updated and is signing in.
+// It pins the collections the app actually uses, so a stray write cannot
+// create new ones, and it caps a document at the size the app enforces:
+//
+// rules_version = '2';
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//     function ok() {
+//       return request.auth != null
+//         && request.resource != null
+//         && request.resource.size() < 250 * 1024;
+//     }
+//     match /sites/{id}  { allow read: if request.auth != null; allow write: if ok(); }
+//     match /parts/{id}  { allow read: if request.auth != null; allow write: if ok(); }
+//     match /tools/{id}  { allow read: if request.auth != null; allow write: if ok(); }
+//     match /pos/{id}    { allow read: if request.auth != null; allow write: if ok(); }
+//     match /users/{id}  { allow read: if request.auth != null; allow write: if ok(); }
+//     match /log/{id}    { allow read: if request.auth != null; allow write: if ok(); }
+//     match /photos/{id} { allow read: if request.auth != null; allow write: if ok(); }
+//   }
+// }
