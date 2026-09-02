@@ -16,7 +16,7 @@ ROOT = r'c:\Users\Dell\Downloads\files'
 # The shipped product. This is the file people are handed, so a fix that has not
 # been rebuilt has not been shipped - treat running this script as part of done.
 OUT_DIR = os.path.join(ROOT, 'Final')
-OUT = os.path.join(OUT_DIR, 'Spare Parts Management System.html')
+OUT = os.path.join(OUT_DIR, 'SPARE PARTS MANAGEMENT SYSTEM V3.1.html')
 
 
 def read(rel):
