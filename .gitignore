@@ -1,3 +1,7 @@
 Thumbs.db
 .DS_Store
 *.log
+
+# Output of build-single-file.py. A test build from js/, not the release --
+# keeping it out of the repo stops it being mistaken for the shipped file.
+Final/dev-build.html

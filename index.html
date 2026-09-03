@@ -3528,6 +3528,7 @@ async function loadState() {
   // Fill in anything an older backup predates
   if (!S.log) S.log = [];
   if (!S.pos) S.pos = [];
+  if (!Array.isArray(S.requests)) S.requests = [];
   if (!S.cfg) S.cfg = { appName: 'SPARE PARTS MANAGEMENT SYSTEM', logo: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNOVCI+CiAgPHRpdGxlPlNOVDwvdGl0bGU+CiAgPGcgZmlsbD0iIzIzOUI0MSI+CiAgICA8IS0tIGJyb2tlbiByaW5nOiB0d28gdGFwZXJlZCBhcmNzLCAxODAgZGVncmVlcyBhcGFydCAtLT4KICAgIDxwYXRoIGQ9Ik0gNTguNCA4OS4zIEEgNjggNjggMCAwIDEgMTgxLjYgODkuMyBBIDgzLjI1IDgzLjI1IDAgMCAwIDU4LjQgODkuMyBaIi8+CiAgICA8cGF0aCBkPSJNIDU4LjQgODkuMyBBIDY4IDY4IDAgMCAxIDE4MS42IDg5LjMgQSA4My4yNSA4My4yNSAwIDAgMCA1OC40IDg5LjMgWiIKICAgICAgICAgIHRyYW5zZm9ybT0icm90YXRlKDE4MCAxMjAgMTE4KSIvPgoKICAgIDwhLS0gTiwgd2l0aCB0aGUgYXBvc3Ryb3BoZSBzbGFzaCBwdW5jaGVkIG91dCBvZiB0aGUgcmlnaHQgc3RlbSAtLT4KICAgIDxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTSAxMDAgODggTCAxMTYgODggTCAxNDIgMTE5LjUgTCAxNDIgODggTCAxNTggODggTCAxNTggMTQ1CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEwgMTQyIDE0NSBMIDExNiAxMTMuNSBMIDExNiAxNDUgTCAxMDAgMTQ1IFoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTSAxNDIgMTA1IEwgMTU4IDg4IEwgMTYxLjU0IDkxLjU0IEwgMTQ1LjU0IDEwOC41NCBaIi8+CgogICAgPCEtLSBULCBhbmdsZWQgbGVmdCBlbmQgb24gdGhlIGNyb3NzYmFyIC0tPgogICAgPHBhdGggZD0iTSAxODMgODggTCAyMjQgODggTCAyMjQgMTA1IEwgMjA3IDEwNSBMIDIwNyAxNDUgTCAxOTAgMTQ1IEwgMTkwIDEwNSBMIDE2NiAxMDUgWiIvPgogIDwvZz4KCiAgPCEtLSBTLCBkcmF3biBhcyBhIHN0cm9rZWQgc3BpbmUgc28gdGhlIHdlaWdodCBzdGF5cyBldmVuIC0tPgogIDxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIzOUI0MSIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiCiAgICAgICAgZD0iTSA5NCA5NiBMIDQzIDk2IEEgMTAgMTAgMCAwIDAgMzMgMTA2IEwgMzMgMTA2LjUgQSAxMCAxMCAwIDAgMCA0MyAxMTYuNQogICAgICAgICAgIEwgNzYgMTE2LjUgQSAxMCAxMCAwIDAgMSA4NiAxMjYuNSBMIDg2IDEyNyBBIDEwIDEwIDAgMCAxIDc2IDEzNyBMIDI1IDEzNyIvPgo8L3N2Zz4K', sheetUrl: '', autoSync: true, poSeq: 1 };
 }
 
@@ -3679,6 +3680,15 @@ const CLOUD_COLS = [
   { col: 'tools', key: 'id', get: () => S.tools, set: (v) => { S.tools = v; } },
   { col: 'pos',   key: 'id', get: () => S.pos,   set: (v) => { S.pos = v; } },
   { col: 'users', key: 'u',  get: () => S.users, set: (v) => { S.users = v; } },
+
+  // Delete requests. These only matter because they cross devices: raised on a
+  // storekeeper's phone, decided on the manager's computer.
+  {
+    col: 'requests', key: 'id',
+    get: () => S.requests || [],
+    set: (v) => { S.requests = v.slice().sort((a, b) => (b.at || 0) - (a.at || 0)); }
+  },
+
   {
     col: 'log', key: 'id',
     get: () => S.log.slice(0, 300),
@@ -5241,6 +5251,7 @@ function seed() {
     pos,
     log,
     users,
+    requests: [],
     cfg: {
       appName: 'SPARE PARTS MANAGEMENT SYSTEM',
       logo: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNOVCI+CiAgPHRpdGxlPlNOVDwvdGl0bGU+CiAgPGcgZmlsbD0iIzIzOUI0MSI+CiAgICA8IS0tIGJyb2tlbiByaW5nOiB0d28gdGFwZXJlZCBhcmNzLCAxODAgZGVncmVlcyBhcGFydCAtLT4KICAgIDxwYXRoIGQ9Ik0gNTguNCA4OS4zIEEgNjggNjggMCAwIDEgMTgxLjYgODkuMyBBIDgzLjI1IDgzLjI1IDAgMCAwIDU4LjQgODkuMyBaIi8+CiAgICA8cGF0aCBkPSJNIDU4LjQgODkuMyBBIDY4IDY4IDAgMCAxIDE4MS42IDg5LjMgQSA4My4yNSA4My4yNSAwIDAgMCA1OC40IDg5LjMgWiIKICAgICAgICAgIHRyYW5zZm9ybT0icm90YXRlKDE4MCAxMjAgMTE4KSIvPgoKICAgIDwhLS0gTiwgd2l0aCB0aGUgYXBvc3Ryb3BoZSBzbGFzaCBwdW5jaGVkIG91dCBvZiB0aGUgcmlnaHQgc3RlbSAtLT4KICAgIDxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTSAxMDAgODggTCAxMTYgODggTCAxNDIgMTE5LjUgTCAxNDIgODggTCAxNTggODggTCAxNTggMTQ1CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEwgMTQyIDE0NSBMIDExNiAxMTMuNSBMIDExNiAxNDUgTCAxMDAgMTQ1IFoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTSAxNDIgMTA1IEwgMTU4IDg4IEwgMTYxLjU0IDkxLjU0IEwgMTQ1LjU0IDEwOC41NCBaIi8+CgogICAgPCEtLSBULCBhbmdsZWQgbGVmdCBlbmQgb24gdGhlIGNyb3NzYmFyIC0tPgogICAgPHBhdGggZD0iTSAxODMgODggTCAyMjQgODggTCAyMjQgMTA1IEwgMjA3IDEwNSBMIDIwNyAxNDUgTCAxOTAgMTQ1IEwgMTkwIDEwNSBMIDE2NiAxMDUgWiIvPgogIDwvZz4KCiAgPCEtLSBTLCBkcmF3biBhcyBhIHN0cm9rZWQgc3BpbmUgc28gdGhlIHdlaWdodCBzdGF5cyBldmVuIC0tPgogIDxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIzOUI0MSIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiCiAgICAgICAgZD0iTSA5NCA5NiBMIDQzIDk2IEEgMTAgMTAgMCAwIDAgMzMgMTA2IEwgMzMgMTA2LjUgQSAxMCAxMCAwIDAgMCA0MyAxMTYuNQogICAgICAgICAgIEwgNzYgMTE2LjUgQSAxMCAxMCAwIDAgMSA4NiAxMjYuNSBMIDg2IDEyNyBBIDEwIDEwIDAgMCAxIDc2IDEzNyBMIDI1IDEzNyIvPgo8L3N2Zz4K',
@@ -6951,9 +6962,21 @@ function buildNav() {
 
 /**
  * Get alert count (for badge)
+ *
+ * Delete requests count too: a person waiting on a decision is more urgent
+ * than a stock line that is merely low, and if the bell does not light for it
+ * nobody finds out a request was ever made.
  */
 function alertCount() {
-  return lowParts().length + overTools().length + calDue().length + warExpiring().length;
+  // Same split the panel uses, so the badge and the list cannot disagree: a
+  // request you raised AND can decide is one item, not two.
+  const toDecide = myPendingReqs();
+  const raised = pendingReqs().filter(
+    (r) => VIEW.user && r.by === VIEW.user.u && toDecide.indexOf(r) === -1
+  );
+
+  return toDecide.length + raised.length +
+    lowParts().length + overTools().length + calDue().length + warExpiring().length;
 }
 
 /**
@@ -7103,10 +7126,39 @@ function alertsModal() {
     </div>
   `;
 
-  const n = low.length + ov.length + cd.length + wx.length;
+  // Delete requests lead. Unlike a low stock line, each one is a person who is
+  // blocked and waiting on an answer from whoever opens this panel.
+  const toDecide = myPendingReqs();
+  const raised = pendingReqs().filter(
+    (r) => VIEW.user && r.by === VIEW.user.u && toDecide.indexOf(r) === -1
+  );
+
+  const reqRow = (r, decide) => `
+    <div class="al" style="padding-left:0;padding-right:0;align-items:flex-start">
+      <div class="al-i out">✕</div>
+      <div style="min-width:0;flex:1">
+        <div class="al-t">${esc(r.label)}</div>
+        <div class="al-s">
+          ${esc(r.kind === 'tool' ? 'Tool' : 'Part')} ·
+          asked by ${esc(r.byName || r.by)} · ${ago(r.at)}${r.why ? ' · “' + esc(r.why) + '”' : ''}
+        </div>
+        <div class="ac" style="margin-top:7px">
+          ${decide
+            ? `<button class="btn sm pri" onclick="approveDelReq('${r.id}')">Approve &amp; delete</button>
+               <button class="btn sm" onclick="declineDelReq('${r.id}')">Decline</button>`
+            : `<span class="pill low">Waiting for a manager</span>
+               <button class="btn sm" onclick="cancelDelReq('${r.id}')">Withdraw</button>`}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const n = toDecide.length + raised.length + low.length + ov.length + cd.length + wx.length;
 
   const body = n
-    ? sec('Stock below minimum', low, (p) =>
+    ? sec('Deletion, waiting on you', toDecide, (r) => reqRow(r, true)) +
+      sec('Your deletion requests', raised, (r) => reqRow(r, false)) +
+      sec('Stock below minimum', low, (p) =>
         row(stockState(p) === 'out' ? 'out' : 'low', '▤', p.name,
           `${p.sku} · ${siteName(p.site)}`, `${p.qty}/${p.min}`)) +
       sec('Tools past due', ov, (t) =>
@@ -7762,7 +7814,9 @@ function partMenu(e, id) {
       ? `<button onclick="closeMenu();poModal(null,'${id}')">⇄ Add to purchase order</button>` : ''}
     <button onclick="closeMenu();go('war')">▣ Warranty register</button>
     ${can('edit') ? `<div class="div"></div><button onclick="closeMenu();partModal('${id}')">✎ Edit part</button>` : ''}
-    ${can('del') ? `<button class="dgr" onclick="closeMenu();delPart('${id}')">✕ Delete part</button>` : ''}
+    ${canDo('parts', 'del')
+      ? `<button class="dgr" onclick="closeMenu();delPart('${id}')">✕ Delete part</button>`
+      : `<button onclick="closeMenu();askDelete('part','${id}')">✕ Request deletion</button>`}
   `);
 }
 
@@ -8152,6 +8206,166 @@ async function savePart(id) {
   if (okState && okPhotos) toast(id ? 'Part updated' : 'Part added', 'good');
 }
 
+/* ============ DELETE REQUESTS ============ */
+/**
+ * Deleting is a manager's decision, but the person who can see that a part is
+ * scrap is usually the storekeeper holding it. So anyone may ask, only someone
+ * with the delete permission may decide, and approving carries the deletion out
+ * rather than leaving a note for somebody to action by hand -- a request that
+ * still needs a second manual step is a request that gets forgotten.
+ */
+
+/** Whether this account can remove this kind of record outright. */
+function canDelete(kind) {
+  return canDo(kind === 'tool' ? 'tools' : 'parts', 'del');
+}
+
+/** The record a request points at, or null once it is gone. */
+function reqItem(r) {
+  return r && r.kind === 'tool' ? toolById(r.item) : partById(r.item);
+}
+
+/** Requests still waiting on a decision. */
+function pendingReqs() {
+  return (S.requests || []).filter((r) => r.status === 'pending');
+}
+
+/**
+ * Pending requests THIS account may decide: the right permission, and a site
+ * it is allowed to see. Without the site test a manager scoped to one
+ * warehouse could delete another warehouse's stock through the request list,
+ * which is a way around the scoping rather than a feature.
+ */
+function myPendingReqs() {
+  return pendingReqs().filter((r) => canDelete(r.kind) && siteAllowed(r.site));
+}
+
+/** Ask for something to be deleted that this account may not delete itself. */
+function askDelete(kind, id) {
+  const o = kind === 'tool' ? toolById(id) : partById(id);
+  if (!o) return toast('That item is no longer here', 'bad');
+
+  const already = pendingReqs().find((r) => r.item === id);
+  if (already) return toast('Someone has already asked for this one', 'bad');
+
+  openModal(`Request deletion`, (o.sku || o.code) + ' · ' + (o.name || ''), `
+    <p style="font-size:13.5px;margin:0 0 12px">
+      You do not have permission to delete this yourself, so this asks a manager
+      to do it. If they approve, <b>${esc(o.name || '')}</b> is removed straight away.
+    </p>
+    <div class="fld">
+      <label>Why should it go? (optional)</label>
+      <input id="reqWhy" placeholder="Damaged beyond repair, wrong part, duplicate entry…"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();submitDelReq('${kind}','${id}')}">
+    </div>
+  `, `
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="submitDelReq('${kind}','${id}')">Send request</button>
+  `);
+}
+
+/** Record the request and let it sync to whoever can decide it. */
+function submitDelReq(kind, id) {
+  const o = kind === 'tool' ? toolById(id) : partById(id);
+  if (!o) return toast('That item is no longer here', 'bad');
+
+  const why = $('#reqWhy') ? $('#reqWhy').value.trim() : '';
+
+  S.requests.unshift({
+    id: uid('rq'),
+    kind,
+    item: id,
+    label: (o.sku || o.code || '') + ' · ' + (o.name || ''),
+    site: o.site || '',
+    by: VIEW.user ? VIEW.user.u : '',
+    byName: VIEW.user ? (VIEW.user.name || VIEW.user.u) : '',
+    why,
+    at: Date.now(),
+    status: 'pending'
+  });
+
+  logIt('del_request', `Asked to delete ${o.name} (${o.sku || o.code})`, o.site, { why });
+  saveState();
+  closeModal();
+  buildNav();
+  render();
+  toast('Request sent to a manager', 'good');
+}
+
+/** Approve: carry out the deletion the request asked for. */
+function approveDelReq(rid) {
+  const r = (S.requests || []).find((x) => x.id === rid);
+  if (!r || r.status !== 'pending') return;
+
+  if (!canDelete(r.kind) || !siteAllowed(r.site)) {
+    return toast('You cannot approve this one', 'bad');
+  }
+
+  const o = reqItem(r);
+
+  // The item may have been deleted by someone else while this sat waiting.
+  // Close the request honestly rather than reporting a deletion that did not
+  // happen on this device.
+  if (!o) {
+    r.status = 'approved';
+    r.note = 'already gone when approved';
+  } else if (r.kind === 'tool') {
+    removeTool(o);
+    r.status = 'approved';
+  } else {
+    removePart(o);
+    r.status = 'approved';
+  }
+
+  r.decidedBy = VIEW.user ? VIEW.user.u : '';
+  r.decidedAt = Date.now();
+
+  logIt('del_approve', `Approved deletion of ${r.label}, asked by ${r.byName}`, r.site);
+  savePhotos();
+  saveState();
+  closeModal();
+  buildNav();
+  render();
+  toast(o ? 'Approved — item deleted' : 'Request closed; it was already gone', 'good');
+}
+
+/** Decline: the item stays, and the request is closed with a reason. */
+function declineDelReq(rid) {
+  const r = (S.requests || []).find((x) => x.id === rid);
+  if (!r || r.status !== 'pending') return;
+
+  if (!canDelete(r.kind) || !siteAllowed(r.site)) {
+    return toast('You cannot decide this one', 'bad');
+  }
+
+  r.status = 'declined';
+  r.decidedBy = VIEW.user ? VIEW.user.u : '';
+  r.decidedAt = Date.now();
+
+  logIt('del_decline', `Declined deletion of ${r.label}, asked by ${r.byName}`, r.site);
+  saveState();
+  closeModal();
+  buildNav();
+  render();
+  toast('Request declined — the item stays', 'good');
+}
+
+/** Withdraw a request you raised yourself. */
+function cancelDelReq(rid) {
+  const r = (S.requests || []).find((x) => x.id === rid);
+  if (!r || r.status !== 'pending') return;
+
+  if (!VIEW.user || r.by !== VIEW.user.u) return toast('That is not your request', 'bad');
+
+  S.requests = S.requests.filter((x) => x.id !== rid);
+  logIt('del_cancel', `Withdrew the request to delete ${r.label}`, r.site);
+  saveState();
+  closeModal();
+  buildNav();
+  render();
+  toast('Request withdrawn', 'good');
+}
+
 /**
  * Confirm part deletion
  */
@@ -8391,7 +8605,9 @@ function toolMenu(e, id) {
       ? `<button onclick="closeMenu();svcToggle('${id}')">${t.status === 'maint' ? '✓ Return to service' : '⚑ Send for service'}</button>`
       : ''}
     ${can('edit') ? `<div class="div"></div><button onclick="closeMenu();toolModal('${id}')">✎ Edit tool</button>` : ''}
-    ${can('del') ? `<button class="dgr" onclick="closeMenu();delTool('${id}')">✕ Delete tool</button>` : ''}
+    ${canDo('tools', 'del')
+      ? `<button class="dgr" onclick="closeMenu();delTool('${id}')">✕ Delete tool</button>`
+      : `<button onclick="closeMenu();askDelete('tool','${id}')">✕ Request deletion</button>`}
   `);
 }
 
