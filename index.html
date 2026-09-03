@@ -1,14 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Spare Parts Management System 3.1 — single-file build with live cloud sync.
+  <!-- Spare Parts Management System 3.2 — single-file build with live cloud sync.
        Runs on the claude.ai viewer store, or on Firebase when hosted anywhere else. -->
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+
+  <!-- No maximum-scale. It never stopped iOS zooming a field on focus, because
+       Safari ignores it, and on Android it takes pinch-zoom away from anyone
+       who needs it. The 16px form fields in the touch block below are what
+       actually stop the zoom. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Spare parts and tools management for solar and battery storage sites: stock, calibration, warranty, purchase orders and photos, shared live across every device.">
   <meta name="theme-color" content="#0D1626">
+
+  <!-- Home-screen install. The manifest is for Android; iOS ignores it and
+       reads the apple-* tags instead, so both have to be here. Both point at
+       files beside the page: when this file is opened on its own they simply
+       do not resolve, which costs nothing. -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="180x180" href="icon-180.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Spare Parts">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>SPARE PARTS MANAGEMENT SYSTEM V3.1</title>
+
+  <title>SPARE PARTS MANAGEMENT SYSTEM V3.2</title>
 
   <!-- CSS Modules -->
   <style>
@@ -2398,6 +2415,86 @@ a {
   color: #C7D4E4;
 }
 
+/* ============ TOUCH DEVICES ============ */
+/**
+ * Keyed on pointer type rather than screen width. A narrow window on a desktop
+ * is still driven with a mouse and wants none of this; a large tablet is driven
+ * with a finger and wants all of it.
+ */
+@media (pointer: coarse) {
+  /* Safari zooms the whole page in when a field smaller than 16px takes focus,
+     and does not zoom back out afterwards. 16px is the threshold that stops it,
+     not a matter of taste -- so this is a minimum, not a restyle.
+     Written through the container ids on purpose: a bare `input` selector
+     loses to `.fld input`, and the fields being corrected are all class-styled
+     at 12.5-15px. */
+  #app input,
+  #app select,
+  #app textarea,
+  #lock input,
+  #lock select,
+  #lock textarea,
+  #modal input,
+  #modal select,
+  #modal textarea {
+    font-size: 16px;
+  }
+
+  /* A fingertip covers roughly 9mm, and this is used one-handed, on the move,
+     sometimes gloved. Density gives way to hitting the right thing. */
+  .btn,
+  .btn.sm,
+  .nav a,
+  .tabs button,
+  .lk-hint-a {
+    min-height: 40px;
+  }
+
+  /* Square and round controls need the width too, or they distort. */
+  .sitebtn,
+  .icbtn,
+  .avat,
+  .m-x {
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  /* The only way to reach the menu, and the only way out of a dialog. */
+  .burger {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* A touch screen cannot hover, but iOS applies the hover state to whatever
+     was tapped last and leaves it there -- so a button stays lit after use,
+     looking selected when it is not. */
+  .btn:hover {
+    background: var(--surface2);
+  }
+
+  .btn.pri:hover {
+    background: var(--brand);
+  }
+
+  .lk-hint-a:hover {
+    color: inherit;
+  }
+}
+
+/**
+ * The visible viewport, with the browser's own chrome excluded.
+ *
+ * Both iOS Safari and Chrome on Android count their toolbars inside 100vh, so
+ * a 100vh shell runs off the bottom of the screen and the last row of a list
+ * sits under the address bar. dvh is the corrected unit; the 100vh rule above
+ * stays untouched as the fallback for anything that lacks it.
+ */
+@supports (height: 100dvh) {
+  .main {
+    min-height: 100dvh;
+  }
+}
+
   </style>
 </head>
 <body>
@@ -2448,7 +2545,7 @@ a {
       </div>
       <nav class="nav" id="nav"></nav>
       <div class="rail-foot">
-        <span>Version 3.1</span>
+        <span>Version 3.2</span>
         <span id="syncDot">● offline</span>
       </div>
     </aside>
@@ -5730,10 +5827,18 @@ function photoEditor() {
              <span>＋</span><span class="phadd-t">Add photo</span>
            </label>`}
     </div>
-    <div class="ac" style="margin-top:8px">
-      <button type="button" class="btn sm" onclick="linkPhoto()" ${full ? 'disabled' : ''}>Add a link</button>
-      ${refs.length ? '<button type="button" class="btn sm" onclick="phDropAll()">Remove all</button>' : ''}
-    </div>
+    ${PHDRAFT && PHDRAFT.linking
+      ? `<div class="ac" style="margin-top:8px;gap:6px">
+           <input id="phLinkIn" type="url" inputmode="url" autocomplete="off"
+             placeholder="https://example.com/photo.jpg" style="flex:1;min-width:0"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();phLinkAdd()}">
+           <button type="button" class="btn sm pri" onclick="phLinkAdd()">Add</button>
+           <button type="button" class="btn sm" onclick="phLinkCancel()">Cancel</button>
+         </div>`
+      : `<div class="ac" style="margin-top:8px">
+           <button type="button" class="btn sm" onclick="linkPhoto()" ${full ? 'disabled' : ''}>Add a link</button>
+           ${refs.length ? '<button type="button" class="btn sm" onclick="phDropAll()">Remove all</button>' : ''}
+         </div>`}
     <div class="hlp" id="phHint">
       ${refs.length
         ? `${refs.length} of ${MAX_EXTRA_PHOTOS + 1} · the first one shows in lists. Saved for everyone when you save the item.`
@@ -5815,20 +5920,47 @@ async function pickPhoto(inp) {
   phRepaint();
 }
 
-/** Add an externally hosted image by address. */
+/**
+ * Reveal the field for adding an externally hosted image by address.
+ *
+ * Inline rather than a dialog: this is reached from inside the open item
+ * editor, and a second modal would replace the first and take the unsaved
+ * draft with it. On a phone an inline field also keeps the keyboard and the
+ * field on screen together.
+ */
 function linkPhoto() {
   if (!PHDRAFT) return;
   if (PHDRAFT.refs.length >= MAX_EXTRA_PHOTOS + 1) return toast('No room for another picture', 'bad');
 
-  const v = prompt('Paste the image address (it must start with http:// or https://)', '');
-  if (v === null) return;
+  PHDRAFT.linking = true;
+  phRepaint();
 
-  const u = v.trim();
-  if (!u) return;
+  const f = $('#phLinkIn');
+  if (f) f.focus();
+}
+
+/** Take what was typed into the link field. */
+function phLinkAdd() {
+  if (!PHDRAFT) return;
+
+  const f = $('#phLinkIn');
+  const u = f ? f.value.trim() : '';
+
+  if (!u) return phLinkCancel();
 
   if (!/^https?:\/\//i.test(u)) return toast('Links must start with http:// or https://', 'bad');
 
   if (!PHDRAFT.refs.includes(u)) PHDRAFT.refs.push(u);
+
+  PHDRAFT.linking = false;
+  phRepaint();
+}
+
+/** Put the link field away without adding anything. */
+function phLinkCancel() {
+  if (!PHDRAFT) return;
+
+  PHDRAFT.linking = false;
   phRepaint();
 }
 
@@ -11046,7 +11178,7 @@ function brand() {
 
   $('#lkName').textContent = c.appName;
   $('#rlName').textContent = c.appName;
-  document.title = c.appName + ' V3.1';
+  document.title = c.appName + ' V3.2';
 }
 
 /**
